@@ -1,0 +1,47 @@
+# Docker Compose per sviluppo locale
+version: '3.8'
+
+services:
+  # Nginx Reverse Proxy
+  nginx:
+    build:
+      context: ./nginx
+      dockerfile: Dockerfile
+    ports:
+      - "8080:80"
+    depends_on:
+      - backend
+      - frontend
+    networks:
+      - bailago-dev
+
+  # Backend API (con hot reload)
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.dev
+    volumes:
+      - ./backend/src:/app/src
+    environment:
+      - NODE_ENV=development
+      - PORT=3000
+      - JWT_SECRET=dev-secret-key-not-for-production
+      - FRONTEND_URL=http://localhost:8080
+    expose:
+      - "3000"
+    networks:
+      - bailago-dev
+
+  # Frontend (solo per test, in dev usa Expo direttamente)
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    expose:
+      - "80"
+    networks:
+      - bailago-dev
+
+networks:
+  bailago-dev:
+    driver: bridge
