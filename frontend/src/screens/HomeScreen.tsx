@@ -10,10 +10,10 @@ import {
 } from 'react-native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
-import { RootStackParamList, DANCE_TYPES } from '../../types';
-import { useAuth, useEvents } from '../../contexts';
-import { EventCard, DanceTypeCard, Button } from '../../components';
-import { colors, spacing, typography, shadows, borderRadius } from '../../theme';
+import { RootStackParamList, DANCE_TYPES } from '../types';
+import { useAuth, useEvents } from '../contexts';
+import { EventCard, DanceTypeCard, Button } from '../components';
+import { colors, spacing, typography, shadows, borderRadius } from '../theme';
 
 type HomeScreenNavigationProp = NativeStackNavigationProp<RootStackParamList, 'MainTabs'>;
 

@@ -1,74 +1,224 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { User } from '../types';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as Google from 'expo-auth-session/providers/google';
+import * as WebBrowser from 'expo-web-browser';
+import { UserFull, RegisterInput } from '../types';
+
+// Per OAuth
+WebBrowser.maybeCompleteAuthSession();
+
+const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000/api';
 
 interface AuthContextType {
-  user: User | null;
+  user: UserFull | null;
+  token: string | null;
   isLoading: boolean;
   isAuthenticated: boolean;
-  login: (username: string, password: string) => Promise<void>;
-  register: (username: string, displayName: string, password: string) => Promise<void>;
+  login: (email: string, password: string) => Promise<void>;
+  register: (data: RegisterInput) => Promise<void>;
   logout: () => Promise<void>;
-  updateProfile: (updates: Partial<User>) => Promise<void>;
+  loginWithGoogle: () => Promise<void>;
+  loginWithInstagram: () => Promise<void>;
+  forgotPassword: (email: string) => Promise<void>;
+  resetPassword: (token: string, password: string) => Promise<void>;
+  resendVerification: () => Promise<void>;
+  updateProfile: (updates: Partial<UserFull>) => Promise<void>;
+  updatePushToken: (pushToken: string) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-// Mock user per development
-const MOCK_USER: User = {
-  id: '1',
-  username: 'bailador',
-  displayName: 'Marco Bailador',
-  bio: 'Amante della salsa e bachata 💃',
-  favoriteDances: ['salsa', 'bachata', 'kizomba'],
-  createdAt: new Date(),
-};
-
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<UserFull | null>(null);
+  const [token, setToken] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  useEffect(() => {
-    // Simula il check dell'autenticazione
-    const checkAuth = async () => {
-      try {
-        // In produzione: verificare il token salvato
-        await new Promise(resolve => setTimeout(resolve, 500));
-        // Per ora usiamo il mock user
-        setUser(MOCK_USER);
-      } catch (error) {
-        setUser(null);
-      } finally {
-        setIsLoading(false);
-      }
-    };
+  // Google OAuth
+  const [request, response, promptAsync] = Google.useIdTokenAuthRequest({
+    clientId: process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID,
+    iosClientId: process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID,
+    androidClientId: process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID,
+  });
 
+  // Gestisce risposta Google OAuth
+  useEffect(() => {
+    if (response?.type === 'success') {
+      const { id_token } = response.params;
+      handleGoogleCallback(id_token);
+    }
+  }, [response]);
+
+  // Check auth all'avvio
+  useEffect(() => {
     checkAuth();
   }, []);
 
-  const login = async (username: string, password: string) => {
-    setIsLoading(true);
+  const checkAuth = async () => {
     try {
-      // In produzione: chiamata API
-      await new Promise(resolve => setTimeout(resolve, 500));
-      setUser(MOCK_USER);
+      const storedToken = await AsyncStorage.getItem('auth_token');
+      if (storedToken) {
+        setToken(storedToken);
+        await fetchCurrentUser(storedToken);
+      }
+    } catch (error) {
+      console.error('Check auth error:', error);
+      await AsyncStorage.removeItem('auth_token');
     } finally {
       setIsLoading(false);
     }
   };
 
-  const register = async (username: string, displayName: string, password: string) => {
+  const fetchCurrentUser = async (authToken: string) => {
+    const res = await fetch(`${API_URL}/auth/me`, {
+      headers: { Authorization: `Bearer ${authToken}` },
+    });
+    
+    if (!res.ok) {
+      throw new Error('Session expired');
+    }
+    
+    const data = await res.json();
+    setUser(data.data.user);
+  };
+
+  const saveAuth = async (authToken: string, userData: UserFull) => {
+    await AsyncStorage.setItem('auth_token', authToken);
+    setToken(authToken);
+    setUser(userData);
+  };
+
+  const login = async (email: string, password: string) => {
     setIsLoading(true);
     try {
-      // In produzione: chiamata API
-      await new Promise(resolve => setTimeout(resolve, 500));
-      const newUser: User = {
-        id: Date.now().toString(),
-        username,
-        displayName,
-        favoriteDances: [],
-        createdAt: new Date(),
-      };
-      setUser(newUser);
+      const res = await fetch(`${API_URL}/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password }),
+      });
+
+      const data = await res.json();
+      
+      if (!res.ok) {
+        throw new Error(data.error || 'Errore durante il login');
+      }
+
+      await saveAuth(data.data.token, data.data.user);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const register = async (input: RegisterInput) => {
+    setIsLoading(true);
+    try {
+      const res = await fetch(`${API_URL}/auth/register`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(input),
+      });
+
+      const data = await res.json();
+      
+      if (!res.ok) {
+        throw new Error(data.error || 'Errore durante la registrazione');
+      }
+
+      await saveAuth(data.data.token, data.data.user);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const loginWithGoogle = async () => {
+    if (!request) {
+      throw new Error('Google login non disponibile');
+    }
+    await promptAsync();
+  };
+
+  const handleGoogleCallback = async (idToken: string) => {
+    setIsLoading(true);
+    try {
+      const res = await fetch(`${API_URL}/auth/oauth/google`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ idToken }),
+      });
+
+      const data = await res.json();
+      
+      if (!res.ok) {
+        throw new Error(data.error || 'Errore con Google');
+      }
+
+      await saveAuth(data.data.token, data.data.user);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const loginWithInstagram = async () => {
+    // Instagram OAuth richiede redirect a una pagina web
+    // In produzione, implementare il flusso OAuth completo
+    throw new Error('Instagram login disponibile prossimamente');
+  };
+
+  const forgotPassword = async (email: string) => {
+    setIsLoading(true);
+    try {
+      const res = await fetch(`${API_URL}/auth/forgot-password`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email }),
+      });
+
+      const data = await res.json();
+      
+      if (!res.ok) {
+        throw new Error(data.error || 'Errore durante la richiesta');
+      }
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const resetPassword = async (resetToken: string, password: string) => {
+    setIsLoading(true);
+    try {
+      const res = await fetch(`${API_URL}/auth/reset-password`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token: resetToken, password }),
+      });
+
+      const data = await res.json();
+      
+      if (!res.ok) {
+        throw new Error(data.error || 'Errore durante il reset');
+      }
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const resendVerification = async () => {
+    if (!token) throw new Error('Non autenticato');
+    
+    setIsLoading(true);
+    try {
+      const res = await fetch(`${API_URL}/auth/resend-verification`, {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      const data = await res.json();
+      
+      if (!res.ok) {
+        throw new Error(data.error || 'Errore durante l\'invio');
+      }
     } finally {
       setIsLoading(false);
     }
@@ -77,32 +227,69 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const logout = async () => {
     setIsLoading(true);
     try {
-      // In produzione: rimuovere token
-      await new Promise(resolve => setTimeout(resolve, 300));
+      await AsyncStorage.removeItem('auth_token');
       setUser(null);
+      setToken(null);
     } finally {
       setIsLoading(false);
     }
   };
 
-  const updateProfile = async (updates: Partial<User>) => {
-    if (!user) return;
+  const updateProfile = async (updates: Partial<UserFull>) => {
+    if (!token || !user) throw new Error('Non autenticato');
     
-    // In produzione: chiamata API
-    await new Promise(resolve => setTimeout(resolve, 300));
-    setUser({ ...user, ...updates });
+    const res = await fetch(`${API_URL}/auth/profile`, {
+      method: 'PUT',
+      headers: { 
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify(updates),
+    });
+
+    const data = await res.json();
+    
+    if (!res.ok) {
+      throw new Error(data.error || 'Errore durante l\'aggiornamento');
+    }
+
+    setUser(data.data.user);
+  };
+
+  const updatePushToken = async (pushToken: string) => {
+    if (!token) return;
+    
+    try {
+      await fetch(`${API_URL}/auth/update-push-token`, {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ pushToken }),
+      });
+    } catch (error) {
+      console.error('Update push token error:', error);
+    }
   };
 
   return (
     <AuthContext.Provider
       value={{
         user,
+        token,
         isLoading,
         isAuthenticated: !!user,
         login,
         register,
         logout,
+        loginWithGoogle,
+        loginWithInstagram,
+        forgotPassword,
+        resetPassword,
+        resendVerification,
         updateProfile,
+        updatePushToken,
       }}
     >
       {children}

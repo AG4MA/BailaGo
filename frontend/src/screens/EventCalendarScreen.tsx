@@ -13,10 +13,10 @@ import { Calendar, DateData } from 'react-native-calendars';
 import { format } from 'date-fns';
 import { it } from 'date-fns/locale';
 import { Ionicons } from '@expo/vector-icons';
-import { RootStackParamList, DanceType, DANCE_TYPES } from '../../types';
-import { useEvents } from '../../contexts';
-import { EventCard, Button } from '../../components';
-import { colors, spacing, typography, borderRadius, shadows } from '../../theme';
+import { RootStackParamList, DanceType, DANCE_TYPES } from '../types';
+import { useEvents } from '../contexts';
+import { EventCard, Button } from '../components';
+import { colors, spacing, typography, borderRadius, shadows } from '../theme';
 
 type EventCalendarNavigationProp = NativeStackNavigationProp<RootStackParamList, 'EventCalendar'>;
 type EventCalendarRouteProp = RouteProp<RootStackParamList, 'EventCalendar'>;

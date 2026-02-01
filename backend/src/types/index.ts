@@ -13,6 +13,9 @@ export type DanceType =
   | 'latin_mix'
   | 'other';
 
+// Provider di autenticazione
+export type AuthProvider = 'local' | 'google' | 'instagram';
+
 export interface Location {
   id: string;
   name: string;
@@ -24,26 +27,68 @@ export interface Location {
 
 export interface User {
   id: string;
-  username: string;
   email: string;
+  username: string;
+  nickname: string;
+  firstName: string;
+  lastName: string;
   displayName: string;
   avatarUrl?: string;
   bio?: string;
   favoriteDances: DanceType[];
+  
+  // Auth
+  provider: AuthProvider;
+  providerId?: string; // ID da Google/Instagram
+  emailVerified: boolean;
+  emailVerificationToken?: string;
+  emailVerificationExpires?: Date;
+  passwordResetToken?: string;
+  passwordResetExpires?: Date;
+  
+  // Push Notifications
+  pushToken?: string;
+  pushEnabled: boolean;
+  
   createdAt: Date;
   updatedAt: Date;
 }
 
 export interface UserCreateInput {
-  username: string;
   email: string;
-  displayName: string;
-  password: string;
+  password?: string;
+  username: string;
+  nickname?: string;
+  firstName?: string;
+  lastName?: string;
+  displayName?: string;
 }
 
 export interface UserLoginInput {
   email: string;
   password: string;
+}
+
+export interface OAuthLoginInput {
+  provider: 'google' | 'instagram';
+  providerId: string;
+  email: string;
+  firstName?: string;
+  lastName?: string;
+  avatarUrl?: string;
+}
+
+export interface ForgotPasswordInput {
+  email: string;
+}
+
+export interface ResetPasswordInput {
+  token: string;
+  password: string;
+}
+
+export interface VerifyEmailInput {
+  token: string;
 }
 
 export interface Participant {

@@ -1,20 +1,33 @@
 import { v4 as uuidv4 } from 'uuid';
+import crypto from 'crypto';
 import bcrypt from 'bcryptjs';
-import { User, UserCreateInput, DanceEvent, CreateEventInput, Participant } from '../types/index.js';
+import { User, UserCreateInput, DanceEvent, CreateEventInput, Participant, AuthProvider, OAuthLoginInput } from '../types/index.js';
+
+// Tipo interno per utente con password
+export type UserWithPassword = User & { password?: string };
 
 // In-memory storage (sostituire con database reale in produzione)
-const users: Map<string, User & { password: string }> = new Map();
+const users: Map<string, UserWithPassword> = new Map();
 const events: Map<string, DanceEvent> = new Map();
 
+// Helper per generare token sicuri
+const generateToken = (): string => crypto.randomBytes(32).toString('hex');
+
 // Seed data
-const seedUser: User & { password: string } = {
+const seedUser: UserWithPassword = {
   id: '1',
   username: 'demo',
+  nickname: 'demo',
+  firstName: 'Demo',
+  lastName: 'User',
   email: 'demo@bailago.app',
+  emailVerified: true,
   displayName: 'Demo User',
   bio: 'Amante della salsa e bachata 💃',
   favoriteDances: ['salsa', 'bachata', 'kizomba'],
   password: bcrypt.hashSync('demo123', 10),
+  provider: 'local',
+  pushEnabled: true,
   createdAt: new Date(),
   updatedAt: new Date(),
 };
@@ -25,31 +38,88 @@ users.set(seedUser.id, seedUser);
 export const db = {
   // Users
   users: {
-    findById: (id: string): (User & { password: string }) | undefined => {
+    findById: (id: string): UserWithPassword | undefined => {
       return users.get(id);
     },
 
-    findByEmail: (email: string): (User & { password: string }) | undefined => {
+    findByEmail: (email: string): UserWithPassword | undefined => {
       return Array.from(users.values()).find(u => u.email === email);
     },
 
-    findByUsername: (username: string): (User & { password: string }) | undefined => {
+    findByUsername: (username: string): UserWithPassword | undefined => {
       return Array.from(users.values()).find(u => u.username === username);
     },
 
+    findByNickname: (nickname: string): UserWithPassword | undefined => {
+      return Array.from(users.values()).find(u => u.nickname === nickname);
+    },
+
+    findByProviderId: (provider: AuthProvider, providerId: string): UserWithPassword | undefined => {
+      return Array.from(users.values()).find(u => u.provider === provider && u.providerId === providerId);
+    },
+
+    findByVerificationToken: (token: string): UserWithPassword | undefined => {
+      return Array.from(users.values()).find(u => u.emailVerificationToken === token);
+    },
+
+    findByPasswordResetToken: (token: string): UserWithPassword | undefined => {
+      return Array.from(users.values()).find(u => 
+        u.passwordResetToken === token && 
+        u.passwordResetExpires && 
+        u.passwordResetExpires > new Date()
+      );
+    },
+
     create: async (input: UserCreateInput): Promise<User> => {
-      const hashedPassword = await bcrypt.hash(input.password, 10);
-      const user: User & { password: string } = {
+      const hashedPassword = input.password ? await bcrypt.hash(input.password, 10) : undefined;
+      const emailVerificationToken = generateToken();
+      const emailVerificationExpires = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 ore
+
+      const user: UserWithPassword = {
         id: uuidv4(),
-        ...input,
+        email: input.email,
+        username: input.username,
+        nickname: input.nickname || input.username,
+        firstName: input.firstName || '',
+        lastName: input.lastName || '',
+        displayName: input.displayName || `${input.firstName || ''} ${input.lastName || ''}`.trim() || input.username,
         password: hashedPassword,
+        emailVerified: false,
+        emailVerificationToken,
+        emailVerificationExpires,
+        provider: 'local',
         favoriteDances: [],
+        pushEnabled: true,
         createdAt: new Date(),
         updatedAt: new Date(),
       };
       users.set(user.id, user);
       const { password, ...userWithoutPassword } = user;
       return userWithoutPassword;
+    },
+
+    createFromOAuth: async (input: OAuthLoginInput): Promise<User> => {
+      const user: UserWithPassword = {
+        id: uuidv4(),
+        email: input.email,
+        username: input.email.split('@')[0] + '_' + uuidv4().substring(0, 6),
+        nickname: input.firstName || input.email.split('@')[0],
+        firstName: input.firstName || '',
+        lastName: input.lastName || '',
+        displayName: input.firstName && input.lastName 
+          ? `${input.firstName} ${input.lastName}` 
+          : input.email.split('@')[0],
+        avatarUrl: input.avatarUrl,
+        emailVerified: true, // OAuth emails sono già verificate
+        provider: input.provider,
+        providerId: input.providerId,
+        favoriteDances: [],
+        pushEnabled: true,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+      users.set(user.id, user);
+      return user;
     },
 
     update: (id: string, updates: Partial<User>): User | undefined => {
@@ -62,8 +132,79 @@ export const db = {
       return userWithoutPassword;
     },
 
-    validatePassword: async (user: User & { password: string }, password: string): Promise<boolean> => {
+    verifyEmail: (token: string): User | undefined => {
+      const user = Array.from(users.values()).find(u => 
+        u.emailVerificationToken === token &&
+        u.emailVerificationExpires &&
+        u.emailVerificationExpires > new Date()
+      );
+
+      if (!user) return undefined;
+
+      user.emailVerified = true;
+      user.emailVerificationToken = undefined;
+      user.emailVerificationExpires = undefined;
+      user.updatedAt = new Date();
+      users.set(user.id, user);
+
+      const { password, ...userWithoutPassword } = user;
+      return userWithoutPassword;
+    },
+
+    createPasswordResetToken: (email: string): { user: User; token: string } | undefined => {
+      const user = Array.from(users.values()).find(u => u.email === email);
+      if (!user) return undefined;
+
+      const token = generateToken();
+      user.passwordResetToken = token;
+      user.passwordResetExpires = new Date(Date.now() + 60 * 60 * 1000); // 1 ora
+      user.updatedAt = new Date();
+      users.set(user.id, user);
+
+      const { password, ...userWithoutPassword } = user;
+      return { user: userWithoutPassword, token };
+    },
+
+    resetPassword: async (token: string, newPassword: string): Promise<User | undefined> => {
+      const user = Array.from(users.values()).find(u => 
+        u.passwordResetToken === token &&
+        u.passwordResetExpires &&
+        u.passwordResetExpires > new Date()
+      );
+
+      if (!user) return undefined;
+
+      user.password = await bcrypt.hash(newPassword, 10);
+      user.passwordResetToken = undefined;
+      user.passwordResetExpires = undefined;
+      user.updatedAt = new Date();
+      users.set(user.id, user);
+
+      const { password, ...userWithoutPassword } = user;
+      return userWithoutPassword;
+    },
+
+    updatePushToken: (userId: string, pushToken: string): User | undefined => {
+      const user = users.get(userId);
+      if (!user) return undefined;
+
+      user.pushToken = pushToken;
+      user.updatedAt = new Date();
+      users.set(user.id, user);
+
+      const { password, ...userWithoutPassword } = user;
+      return userWithoutPassword;
+    },
+
+    validatePassword: async (user: UserWithPassword, password: string): Promise<boolean> => {
+      if (!user.password) return false;
       return bcrypt.compare(password, user.password);
+    },
+
+    getAllWithPushToken: (): User[] => {
+      return Array.from(users.values())
+        .filter(u => u.pushToken && u.pushEnabled)
+        .map(({ password, ...user }) => user);
     },
   },
 

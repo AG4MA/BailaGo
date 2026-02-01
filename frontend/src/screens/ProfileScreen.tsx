@@ -10,10 +10,10 @@ import {
   Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useAuth } from '../../contexts';
-import { Button, DanceTypeCard } from '../../components';
-import { DANCE_TYPES, DanceType } from '../../types';
-import { colors, spacing, typography, borderRadius, shadows } from '../../theme';
+import { useAuth } from '../contexts';
+import { Button, DanceTypeCard } from '../components';
+import { DANCE_TYPES, DanceType } from '../types';
+import { colors, spacing, typography, borderRadius, shadows } from '../theme';
 
 export function ProfileScreen() {
   const { user, logout, updateProfile } = useAuth();

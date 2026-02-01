@@ -7,9 +7,9 @@ import {
   SafeAreaView,
 } from 'react-native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { RootStackParamList, DANCE_TYPES } from '../../types';
-import { DanceTypeCard } from '../../components';
-import { colors, spacing, typography } from '../../theme';
+import { RootStackParamList, DANCE_TYPES } from '../types';
+import { DanceTypeCard } from '../components';
+import { colors, spacing, typography } from '../theme';
 
 type DanceTypeSelectionNavigationProp = NativeStackNavigationProp<
   RootStackParamList,

@@ -98,6 +98,15 @@ export interface CreateEventData {
 
 // Navigation types
 export type RootStackParamList = {
+  // Auth screens
+  Login: undefined;
+  Register: undefined;
+  ForgotPassword: undefined;
+  VerifyEmail: { email: string };
+  ResetPassword: { token: string };
+  
+  // Main app screens
+  Main: undefined;
   MainTabs: undefined;
   DanceTypeSelection: undefined;
   EventCalendar: { danceType: DanceType };
@@ -111,3 +120,27 @@ export type MainTabParamList = {
   MyEvents: undefined;
   Profile: undefined;
 };
+
+// Auth provider type
+export type AuthProvider = 'local' | 'google' | 'instagram';
+
+// Extended User type
+export interface UserFull extends User {
+  email: string;
+  nickname?: string;
+  firstName?: string;
+  lastName?: string;
+  emailVerified?: boolean;
+  provider?: AuthProvider;
+  pushEnabled?: boolean;
+}
+
+// Registration input
+export interface RegisterInput {
+  email: string;
+  password: string;
+  username: string;
+  nickname: string;
+  firstName: string;
+  lastName: string;
+}

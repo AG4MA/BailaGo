@@ -8,11 +8,11 @@ import {
   TouchableOpacity,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useAuth, useEvents } from '../../contexts';
-import { EventCard } from '../../components';
-import { colors, spacing, typography, borderRadius, shadows } from '../../theme';
+import { useAuth, useEvents } from '../contexts';
+import { EventCard } from '../components';
+import { colors, spacing, typography, borderRadius, shadows } from '../theme';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { RootStackParamList, DANCE_TYPES } from '../../types';
+import { RootStackParamList, DANCE_TYPES } from '../types';
 
 type MyEventsNavigationProp = NativeStackNavigationProp<RootStackParamList, 'MainTabs'>;
 

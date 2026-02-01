@@ -115,10 +115,17 @@ cd /opt/bailago
 ## 🔌 API Endpoints
 
 ### Auth
-- `POST /api/auth/register` - Registrazione
-- `POST /api/auth/login` - Login
+- `POST /api/auth/register` - Registrazione (email, password, nickname, nome, cognome)
+- `POST /api/auth/login` - Login con email/password
+- `POST /api/auth/oauth/google` - Login con Google OAuth
+- `POST /api/auth/oauth/instagram` - Login con Instagram OAuth
+- `POST /api/auth/verify-email` - Verifica email con token
+- `POST /api/auth/resend-verification` - Rinvia email di verifica
+- `POST /api/auth/forgot-password` - Richiedi reset password
+- `POST /api/auth/reset-password` - Reset password con token
 - `GET /api/auth/me` - Profilo utente
 - `PUT /api/auth/profile` - Aggiorna profilo
+- `POST /api/auth/update-push-token` - Aggiorna token push notifications
 
 ### Events
 - `GET /api/events` - Lista eventi (filtri: danceType, city)
@@ -128,6 +135,34 @@ cd /opt/bailago
 - `DELETE /api/events/:id` - Elimina evento (solo creatore)
 - `POST /api/events/:id/join` - Partecipa (auth)
 - `DELETE /api/events/:id/leave` - Lascia evento (auth)
+
+## 🔐 Autenticazione
+
+### Flusso Registrazione
+1. Utente inserisce: email, password, nickname, nome, cognome
+2. Backend crea account e genera token verifica email (24h)
+3. Email inviata con link di verifica
+4. Utente può usare l'app ma con funzionalità limitate
+5. Click sul link → email verificata → accesso completo
+
+### OAuth (Google / Instagram)
+- Login con un click se account Google già presente
+- Instagram per utenti senza email Google
+- Account creato automaticamente al primo login
+- Email già verificata per OAuth
+
+### Reset Password
+1. Utente richiede reset inserendo email
+2. Email con link di reset (valido 1h)
+3. Click → form nuova password
+4. Password cambiata → email di conferma
+
+### Push Notifications
+- Nuovo evento nella tua zona
+- Reminder 30 min prima dell'evento
+- Qualcuno si unisce al tuo evento
+- Evento modificato o cancellato
+- Messaggio dall'organizzatore
 
 ## 📱 Features
 

@@ -16,10 +16,10 @@ import { RouteProp } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { format, parse } from 'date-fns';
 import { it } from 'date-fns/locale';
-import { RootStackParamList, DANCE_TYPES, CreateEventData, Location } from '../../types';
-import { useEvents } from '../../contexts';
-import { Button, Input } from '../../components';
-import { colors, spacing, typography, borderRadius, shadows } from '../../theme';
+import { RootStackParamList, DANCE_TYPES, CreateEventData, Location } from '../types';
+import { useEvents } from '../contexts';
+import { Button, Input } from '../components';
+import { colors, spacing, typography, borderRadius, shadows } from '../theme';
 
 type CreateEventNavigationProp = NativeStackNavigationProp<RootStackParamList, 'CreateEvent'>;
 type CreateEventRouteProp = RouteProp<RootStackParamList, 'CreateEvent'>;
