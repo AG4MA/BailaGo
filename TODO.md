@@ -408,3 +408,19 @@ EXPO_PUBLIC_PROJECT_ID=
 ---
 
 *Questo file viene aggiornato manualmente. Controlla i commit per lo storico delle modifiche.*
+
+
+
+da fare
+
+QUANDO fai aggiungi persona all'interno di un gruppo, devi fare query veloce veloce su tutti quelli che ci sono nell'app, e cercare in base al nickname, non alla mail
+
+se lasci il gruppo ma lhai creato tu, quando esci devi designare per forza un altra persona all'interno del gruppo, se sei solo all'interno non ce lascia gruppo ma solo elimina se l'hai creato tu. nessun lttro lo puo eliminare, come nesusn altro puo eliminare un evento se non lha creato lui, anche se pubblico
+
+
+non è ancora possibile creare un evento, da un sacco di errori nel terminale. quando crei un evento, nella sezione lugo, deve esserci solamente una barra che poi sara aiutata da API google per ricerca automatica, e sotto la barra ci deve essere la mappa, perche in realta anche psostando il cursore (fisso nella mappa) puoi decidere il luogo cosi in versione piu manuale
+
+sotto prosismi eventi, i filtri dei balli vanno bene, ma quando selezionata la famiglia, deve uscire una sotto barra con tutti i suoi sotto balli selezionabili ok? deve esserci anche tutti nei sub balli
+
+
+MI RACCOMANDO NON TIRARE GIU IL SERVER, esegui modifiche in live

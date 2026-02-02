@@ -1,7 +1,11 @@
 import React, { createContext, useContext, useState, ReactNode } from 'react';
-import { v4 as uuidv4 } from 'uuid';
 import { DanceEvent, CreateEventData, DanceType, User, Participant } from '../types';
 import { useAuth } from './AuthContext';
+
+// Semplice generatore di ID per React Native
+const generateId = (): string => {
+  return `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+};
 
 interface EventsContextType {
   events: DanceEvent[];
@@ -146,7 +150,7 @@ export function EventsProvider({ children }: { children: ReactNode }) {
       await new Promise(resolve => setTimeout(resolve, 500));
 
       const newEvent: DanceEvent = {
-        id: uuidv4(),
+        id: generateId(),
         ...data,
         creatorId: user.id,
         creator: user,

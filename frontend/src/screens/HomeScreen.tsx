@@ -6,14 +6,13 @@ import {
   ScrollView,
   TouchableOpacity,
   StatusBar,
-  TextInput,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
-import { RootStackParamList, DANCE_TYPES, DanceType } from '../types';
+import { RootStackParamList, DANCE_FAMILIES, DanceFamilyId, DanceType, getDancesByFamily } from '../types';
 import { useAuth, useEvents } from '../contexts';
-import { EventCard, DanceTypeCard, Button } from '../components';
+import { EventCard, Button } from '../components';
 import { colors, spacing, typography, shadows, borderRadius } from '../theme';
 
 type HomeScreenNavigationProp = NativeStackNavigationProp<RootStackParamList, 'MainTabs'>;
@@ -26,32 +25,39 @@ export function HomeScreen({ navigation }: HomeScreenProps) {
   const { user } = useAuth();
   const { events } = useEvents();
   
-  // Stati per ricerca e filtri
-  const [searchCity, setSearchCity] = useState('');
-  const [selectedDanceFilter, setSelectedDanceFilter] = useState<DanceType | null>(null);
+  // Filtri per famiglia e sotto-balli
+  const [selectedFamily, setSelectedFamily] = useState<DanceFamilyId | null>(null);
+  const [selectedDanceTypes, setSelectedDanceTypes] = useState<DanceType[]>([]);
 
-  // Filtra eventi
-  const filteredEvents = useMemo(() => {
-    let result = events.filter(e => new Date(e.date) >= new Date());
+  // Balli della famiglia selezionata
+  const familyDances = useMemo(() => {
+    if (!selectedFamily) return [];
+    return getDancesByFamily(selectedFamily);
+  }, [selectedFamily]);
+
+  // Prossimi eventi (solo futuri, ordinati cronologicamente)
+  const upcomingEvents = useMemo(() => {
+    const now = new Date();
+    let result = events.filter(e => new Date(e.date) >= now);
     
-    if (searchCity.trim()) {
-      result = result.filter(e => 
-        e.location.city.toLowerCase().includes(searchCity.toLowerCase())
-      );
+    // Filtro per sotto-balli selezionati o tutta la famiglia
+    if (selectedDanceTypes.length > 0) {
+      result = result.filter(e => selectedDanceTypes.includes(e.danceType));
+    } else if (selectedFamily) {
+      const familyDanceIds = getDancesByFamily(selectedFamily).map(d => d.id);
+      result = result.filter(e => familyDanceIds.includes(e.danceType));
     }
     
-    if (selectedDanceFilter) {
-      result = result.filter(e => e.danceType === selectedDanceFilter);
-    }
-    
-    return result.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-  }, [events, searchCity, selectedDanceFilter]);
+    return result
+      .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+      .slice(0, 5); // Mostra solo i primi 5 nella Home
+  }, [events, selectedFamily, selectedDanceTypes]);
 
-  // Prossimi eventi (ordina per data)
-  const upcomingEvents = filteredEvents.slice(0, 10);
-
-  const handleDanceTypePress = (danceTypeId: string) => {
-    navigation.navigate('EventCalendar', { danceType: danceTypeId as any });
+  // Verifica se l'utente partecipa a un evento
+  const isUserParticipating = (eventId: string) => {
+    const event = events.find(e => e.id === eventId);
+    if (!event || !user) return false;
+    return event.participants.some(p => p.userId === user.id) || event.creatorId === user.id;
   };
 
   const handleEventPress = (eventId: string) => {
@@ -62,6 +68,42 @@ export function HomeScreen({ navigation }: HomeScreenProps) {
     navigation.navigate('DanceTypeSelection');
   };
 
+  const handleSeeAllPress = () => {
+    navigation.navigate('AllEvents', {});
+  };
+
+  const handleFamilyPress = (familyId: DanceFamilyId) => {
+    if (selectedFamily === familyId) {
+      // Deseleziona
+      setSelectedFamily(null);
+      setSelectedDanceTypes([]);
+    } else {
+      // Seleziona nuova famiglia
+      setSelectedFamily(familyId);
+      setSelectedDanceTypes([]);
+    }
+  };
+
+  const handleSubDancePress = (danceType: DanceType) => {
+    if (selectedDanceTypes.includes(danceType)) {
+      setSelectedDanceTypes(selectedDanceTypes.filter(d => d !== danceType));
+    } else {
+      setSelectedDanceTypes([...selectedDanceTypes, danceType]);
+    }
+  };
+
+  const handleSelectAllSubDances = () => {
+    if (!selectedFamily) return;
+    const allDances = getDancesByFamily(selectedFamily).map(d => d.id);
+    if (selectedDanceTypes.length === allDances.length) {
+      // Deseleziona tutti
+      setSelectedDanceTypes([]);
+    } else {
+      // Seleziona tutti
+      setSelectedDanceTypes(allDances);
+    }
+  };
+
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="dark-content" backgroundColor={colors.background} />
@@ -70,114 +112,115 @@ export function HomeScreen({ navigation }: HomeScreenProps) {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
       >
-        {/* Header */}
+        {/* Saluto minimale */}
         <View style={styles.header}>
-          <View>
-            <Text style={styles.greeting}>
-              Ciao, {user?.displayName?.split(' ')[0] || 'Bailador'} 👋
-            </Text>
-            <Text style={styles.subtitle}>Pronto a ballare?</Text>
-          </View>
-          <TouchableOpacity style={styles.notificationBtn}>
-            <Ionicons name="notifications-outline" size={24} color={colors.text} />
-          </TouchableOpacity>
+          <Text style={styles.greeting}>
+            Ciao, {user?.displayName?.split(' ')[0] || 'Bailador'} 👋
+          </Text>
         </View>
 
-        {/* Create Event CTA */}
+        {/* CTA primaria - Organizza un ballo */}
         <TouchableOpacity style={styles.ctaCard} onPress={handleCreatePress}>
           <View style={styles.ctaContent}>
-            <Text style={styles.ctaEmoji}>💃🕺</Text>
+            <Text style={styles.ctaEmoji}>💃</Text>
             <View style={styles.ctaText}>
-              <Text style={styles.ctaTitle}>Organizza un ballo!</Text>
-              <Text style={styles.ctaSubtitle}>
-                Crea un evento e invita i tuoi amici
-              </Text>
+              <Text style={styles.ctaTitle}>Organizza un ballo</Text>
+              <Text style={styles.ctaSubtitle}>Crea il tuo evento</Text>
             </View>
           </View>
-          <Ionicons name="arrow-forward-circle" size={32} color={colors.textWhite} />
+          <Ionicons name="add-circle" size={28} color={colors.textWhite} />
         </TouchableOpacity>
 
-        {/* Search Bar */}
-        <View style={styles.searchSection}>
-          <View style={styles.searchBar}>
-            <Ionicons name="search" size={20} color={colors.textSecondary} />
-            <TextInput
-              style={styles.searchInput}
-              placeholder="Cerca per città..."
-              placeholderTextColor={colors.textSecondary}
-              value={searchCity}
-              onChangeText={setSearchCity}
-            />
-            {searchCity.length > 0 && (
-              <TouchableOpacity onPress={() => setSearchCity('')}>
-                <Ionicons name="close-circle" size={20} color={colors.textSecondary} />
-              </TouchableOpacity>
-            )}
+        {/* Sezione Prossimi eventi */}
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Prossimi eventi</Text>
+            <TouchableOpacity onPress={handleSeeAllPress} style={styles.seeAllBtn}>
+              <Text style={styles.seeAllText}>Vedi tutti</Text>
+              <Ionicons name="chevron-forward" size={16} color={colors.primary} />
+            </TouchableOpacity>
           </View>
           
-          {/* Dance Filter Chips */}
+          {/* Filtri per famiglia di ballo */}
           <ScrollView 
             horizontal 
             showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.filterChipsContainer}
+            contentContainerStyle={styles.filtersContainer}
           >
             <TouchableOpacity
-              style={[styles.filterChip, !selectedDanceFilter && styles.filterChipSelected]}
-              onPress={() => setSelectedDanceFilter(null)}
+              style={[styles.filterChip, !selectedFamily && styles.filterChipActive]}
+              onPress={() => handleFamilyPress(null as any)}
             >
-              <Text style={[styles.filterChipText, !selectedDanceFilter && styles.filterChipTextSelected]}>
+              <Text style={[styles.filterChipText, !selectedFamily && styles.filterChipTextActive]}>
                 Tutti
               </Text>
             </TouchableOpacity>
-            {DANCE_TYPES.slice(0, 8).map((dt) => (
+            {DANCE_FAMILIES.filter(f => f.id !== 'other').slice(0, 6).map((family) => (
               <TouchableOpacity
-                key={dt.id}
+                key={family.id}
                 style={[
                   styles.filterChip, 
-                  selectedDanceFilter === dt.id && { backgroundColor: dt.color }
+                  selectedFamily === family.id && { backgroundColor: family.color }
                 ]}
-                onPress={() => setSelectedDanceFilter(selectedDanceFilter === dt.id ? null : dt.id)}
+                onPress={() => handleFamilyPress(family.id)}
               >
-                <Text style={styles.filterChipEmoji}>{dt.emoji}</Text>
+                <Text style={styles.filterChipEmoji}>{family.emoji}</Text>
                 <Text style={[
                   styles.filterChipText,
-                  selectedDanceFilter === dt.id && styles.filterChipTextSelected
+                  selectedFamily === family.id && styles.filterChipTextActive
                 ]}>
-                  {dt.name}
+                  {family.name}
                 </Text>
               </TouchableOpacity>
             ))}
           </ScrollView>
-        </View>
-
-        {/* Dance Types */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Scegli il tuo ballo</Text>
-          <ScrollView 
-            horizontal 
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.danceTypesContainer}
-          >
-            {DANCE_TYPES.map((danceType) => (
-              <DanceTypeCard
-                key={danceType.id}
-                danceType={danceType}
-                onPress={() => handleDanceTypePress(danceType.id)}
-                size="medium"
-              />
-            ))}
-          </ScrollView>
-        </View>
-
-        {/* Upcoming Events */}
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Prossimi eventi</Text>
-            <TouchableOpacity>
-              <Text style={styles.seeAll}>Vedi tutti</Text>
-            </TouchableOpacity>
-          </View>
           
+          {/* Sotto-barra: filtri sotto-balli quando famiglia selezionata */}
+          {selectedFamily && familyDances.length > 0 && (
+            <ScrollView 
+              horizontal 
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.subFiltersContainer}
+            >
+              <TouchableOpacity
+                style={[
+                  styles.subFilterChip, 
+                  selectedDanceTypes.length === 0 && styles.subFilterChipActive
+                ]}
+                onPress={() => setSelectedDanceTypes([])}
+              >
+                <Text style={[
+                  styles.subFilterChipText,
+                  selectedDanceTypes.length === 0 && styles.subFilterChipTextActive
+                ]}>
+                  Tutti
+                </Text>
+              </TouchableOpacity>
+              {familyDances.map((dance) => (
+                <TouchableOpacity
+                  key={dance.id}
+                  style={[
+                    styles.subFilterChip, 
+                    selectedDanceTypes.includes(dance.id) && { 
+                      backgroundColor: dance.color,
+                      borderColor: dance.color
+                    }
+                  ]}
+                  onPress={() => handleSubDancePress(dance.id)}
+                >
+                  <Text style={styles.subFilterChipEmoji}>{dance.emoji}</Text>
+                  <Text style={[
+                    styles.subFilterChipText,
+                    selectedDanceTypes.includes(dance.id) && styles.subFilterChipTextActive
+                  ]}>
+                    {dance.name}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          )}
+          
+          {/* Lista eventi */}
           {upcomingEvents.length > 0 ? (
             <View style={styles.eventsContainer}>
               {upcomingEvents.map((event) => (
@@ -185,6 +228,7 @@ export function HomeScreen({ navigation }: HomeScreenProps) {
                   key={event.id}
                   event={event}
                   onPress={() => handleEventPress(event.id)}
+                  isParticipating={isUserParticipating(event.id)}
                 />
               ))}
             </View>
@@ -193,7 +237,7 @@ export function HomeScreen({ navigation }: HomeScreenProps) {
               <Text style={styles.emptyEmoji}>🎵</Text>
               <Text style={styles.emptyTitle}>Nessun evento in programma</Text>
               <Text style={styles.emptySubtitle}>
-                Sii il primo a creare un evento nella tua zona!
+                Sii il primo a creare un evento!
               </Text>
               <Button
                 title="Crea evento"
@@ -219,10 +263,8 @@ const styles = StyleSheet.create({
     paddingBottom: spacing.xxl,
   },
   
+  // Header minimale
   header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.md,
   },
@@ -232,28 +274,14 @@ const styles = StyleSheet.create({
     color: colors.text,
   },
   
-  subtitle: {
-    ...typography.body,
-    color: colors.textSecondary,
-    marginTop: spacing.xs,
-  },
-  
-  notificationBtn: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: colors.backgroundSecondary,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  
+  // CTA primaria
   ctaCard: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     backgroundColor: colors.primary,
     marginHorizontal: spacing.lg,
-    marginVertical: spacing.md,
+    marginBottom: spacing.lg,
     padding: spacing.lg,
     borderRadius: borderRadius.xl,
     ...shadows.medium,
@@ -266,7 +294,7 @@ const styles = StyleSheet.create({
   },
   
   ctaEmoji: {
-    fontSize: 32,
+    fontSize: 28,
     marginRight: spacing.md,
   },
   
@@ -282,12 +310,13 @@ const styles = StyleSheet.create({
   ctaSubtitle: {
     ...typography.bodySmall,
     color: colors.textWhite,
-    opacity: 0.9,
+    opacity: 0.85,
     marginTop: 2,
   },
   
+  // Sezione
   section: {
-    marginTop: spacing.lg,
+    marginTop: spacing.sm,
   },
   
   sectionHeader: {
@@ -295,32 +324,107 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: spacing.lg,
-    marginBottom: spacing.md,
+    marginBottom: spacing.sm,
   },
   
   sectionTitle: {
     ...typography.h3,
     color: colors.text,
-    paddingHorizontal: spacing.lg,
-    marginBottom: spacing.md,
   },
   
-  seeAll: {
+  seeAllBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 2,
+  },
+  
+  seeAllText: {
     ...typography.body,
     color: colors.primary,
     fontWeight: '600',
   },
   
-  danceTypesContainer: {
+  // Filtri compatti
+  filtersContainer: {
     paddingHorizontal: spacing.lg,
-    gap: spacing.md,
+    paddingBottom: spacing.md,
+    gap: spacing.sm,
   },
   
+  filterChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.backgroundSecondary,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderRadius: borderRadius.full,
+    gap: spacing.xs,
+  },
+  
+  filterChipActive: {
+    backgroundColor: colors.primary,
+  },
+  
+  filterChipEmoji: {
+    fontSize: 14,
+  },
+  
+  filterChipText: {
+    ...typography.bodySmall,
+    color: colors.text,
+    fontWeight: '500',
+  },
+  
+  filterChipTextActive: {
+    color: colors.textWhite,
+  },
+  
+  // Sotto-filtri per sotto-balli
+  subFiltersContainer: {
+    paddingHorizontal: spacing.lg,
+    paddingBottom: spacing.sm,
+    paddingTop: spacing.xs,
+    gap: spacing.xs,
+  },
+  
+  subFilterChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.backgroundSecondary,
+    paddingHorizontal: spacing.sm + 2,
+    paddingVertical: spacing.xs + 2,
+    borderRadius: borderRadius.full,
+    borderWidth: 1,
+    borderColor: colors.border,
+    gap: 4,
+  },
+  
+  subFilterChipActive: {
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
+  },
+  
+  subFilterChipEmoji: {
+    fontSize: 12,
+  },
+  
+  subFilterChipText: {
+    fontSize: 11,
+    color: colors.text,
+    fontWeight: '500',
+  },
+  
+  subFilterChipTextActive: {
+    color: colors.textWhite,
+  },
+  
+  // Lista eventi
   eventsContainer: {
     paddingHorizontal: spacing.lg,
     gap: spacing.md,
   },
   
+  // Stato vuoto
   emptyState: {
     alignItems: 'center',
     justifyContent: 'center',
@@ -344,61 +448,5 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
     textAlign: 'center',
     marginBottom: spacing.lg,
-  },
-  
-  // Search styles
-  searchSection: {
-    marginTop: spacing.md,
-  },
-  
-  searchBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: colors.backgroundSecondary,
-    marginHorizontal: spacing.lg,
-    paddingHorizontal: spacing.md,
-    borderRadius: borderRadius.md,
-    gap: spacing.sm,
-  },
-  
-  searchInput: {
-    flex: 1,
-    paddingVertical: spacing.sm + 4,
-    ...typography.body,
-    color: colors.text,
-  },
-  
-  filterChipsContainer: {
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
-    gap: spacing.sm,
-  },
-  
-  filterChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: colors.backgroundSecondary,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    borderRadius: borderRadius.lg,
-    gap: spacing.xs,
-  },
-  
-  filterChipSelected: {
-    backgroundColor: colors.primary,
-  },
-  
-  filterChipEmoji: {
-    fontSize: 14,
-  },
-  
-  filterChipText: {
-    ...typography.bodySmall,
-    color: colors.text,
-    fontWeight: '500',
-  },
-  
-  filterChipTextSelected: {
-    color: '#fff',
   },
 });

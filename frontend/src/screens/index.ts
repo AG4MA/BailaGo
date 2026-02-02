@@ -1,4 +1,5 @@
 export { HomeScreen } from './HomeScreen';
+export { AllEventsScreen } from './AllEventsScreen';
 export { DanceTypeSelectionScreen } from './DanceTypeSelectionScreen';
 export { EventCalendarScreen } from './EventCalendarScreen';
 export { CreateEventScreen } from './CreateEventScreen';

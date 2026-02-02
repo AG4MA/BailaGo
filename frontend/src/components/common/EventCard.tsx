@@ -16,15 +16,22 @@ interface EventCardProps {
   event: DanceEvent;
   onPress: () => void;
   compact?: boolean;
+  isParticipating?: boolean; // Indica se l'utente corrente partecipa
 }
 
-export function EventCard({ event, onPress, compact = false }: EventCardProps) {
+export function EventCard({ event, onPress, compact = false, isParticipating = false }: EventCardProps) {
   const danceInfo = DANCE_TYPES.find(d => d.id === event.danceType);
   const participantCount = event.participants.length;
   
   if (compact) {
     return (
-      <TouchableOpacity style={styles.compactContainer} onPress={onPress}>
+      <TouchableOpacity 
+        style={[
+          styles.compactContainer, 
+          isParticipating && styles.participatingCompact
+        ]} 
+        onPress={onPress}
+      >
         <View style={[styles.colorBar, { backgroundColor: danceInfo?.color }]} />
         <View style={styles.compactContent}>
           <Text style={styles.compactTitle} numberOfLines={1}>{event.title}</Text>
@@ -44,7 +51,21 @@ export function EventCard({ event, onPress, compact = false }: EventCardProps) {
   }
 
   return (
-    <TouchableOpacity style={styles.container} onPress={onPress} activeOpacity={0.9}>
+    <TouchableOpacity 
+      style={[
+        styles.container, 
+        isParticipating && styles.participatingCard
+      ]} 
+      onPress={onPress} 
+      activeOpacity={0.9}
+    >
+      {/* Badge partecipazione */}
+      {isParticipating && (
+        <View style={styles.participatingBadge}>
+          <Ionicons name="checkmark-circle" size={14} color={colors.textWhite} />
+          <Text style={styles.participatingBadgeText}>Partecipo</Text>
+        </View>
+      )}
       {event.imageUrl ? (
         <Image source={{ uri: event.imageUrl }} style={styles.image} />
       ) : (
@@ -120,6 +141,38 @@ const styles = StyleSheet.create({
     borderRadius: borderRadius.lg,
     overflow: 'hidden',
     ...shadows.medium,
+  },
+  
+  // Stile per eventi a cui partecipo
+  participatingCard: {
+    borderWidth: 2,
+    borderColor: colors.primary,
+  },
+  
+  participatingBadge: {
+    position: 'absolute',
+    top: spacing.sm,
+    right: spacing.sm,
+    backgroundColor: colors.primary,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
+    borderRadius: borderRadius.full,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    zIndex: 10,
+  },
+  
+  participatingBadgeText: {
+    ...typography.caption,
+    color: colors.textWhite,
+    fontWeight: '600',
+  },
+  
+  participatingCompact: {
+    borderWidth: 2,
+    borderColor: colors.primary,
+    backgroundColor: `${colors.primary}08`,
   },
   
   image: {

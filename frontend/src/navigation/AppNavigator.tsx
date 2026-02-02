@@ -7,6 +7,7 @@ import { RootStackParamList, MainTabParamList } from '../types';
 import { useAuth } from '../contexts/AuthContext';
 import {
   HomeScreen,
+  AllEventsScreen,
   DanceTypeSelectionScreen,
   EventCalendarScreen,
   CreateEventScreen,
@@ -160,6 +161,14 @@ export function AppNavigator() {
               options={{ 
                 title: 'Scegli il ballo',
                 headerBackTitle: 'Indietro',
+              }}
+            />
+            <Stack.Screen 
+              name="AllEvents" 
+              component={AllEventsScreen}
+              options={{ 
+                title: 'Tutti gli eventi',
+                headerBackTitle: 'Home',
               }}
             />
             <Stack.Screen 
