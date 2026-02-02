@@ -448,3 +448,5 @@ Non riavviare il server per applicare modifiche o fare controlli. Lavora con hot
 
 Output atteso
 Implementa le modifiche sopra con priorità su: creazione evento funzionante, luogo con input più mappa, logica gruppo creator, ricerca nickname, ripristino visibilità gruppo, filtri con sotto-balli, ruolo DJ, policy inattività account con flussi email.
+
+e manca ancora il fatto di poter togliersi dalla partecipazione di un evnto
