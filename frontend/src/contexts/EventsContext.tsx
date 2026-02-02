@@ -134,10 +134,15 @@ export function EventsProvider({ children }: { children: ReactNode }) {
   };
 
   const createEvent = async (data: CreateEventData): Promise<DanceEvent> => {
-    if (!user) throw new Error('User not authenticated');
+    console.log('[EventsContext] createEvent called', { user: user?.email, data });
+    if (!user) {
+      console.error('[EventsContext] User not authenticated!');
+      throw new Error('User not authenticated');
+    }
 
     setIsLoading(true);
     try {
+      console.log('[EventsContext] Creating event...');
       await new Promise(resolve => setTimeout(resolve, 500));
 
       const newEvent: DanceEvent = {

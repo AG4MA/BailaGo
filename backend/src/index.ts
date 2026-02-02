@@ -5,6 +5,7 @@ import morgan from 'morgan';
 import { config } from './config/index.js';
 import authRoutes from './routes/auth.js';
 import eventsRoutes from './routes/events.js';
+import groupsRoutes from './routes/groups.js';
 
 const app = express();
 
@@ -40,6 +41,7 @@ app.get('/health', (req, res) => {
 // API Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/events', eventsRoutes);
+app.use('/api/groups', groupsRoutes);
 
 // 404 handler
 app.use((req, res) => {

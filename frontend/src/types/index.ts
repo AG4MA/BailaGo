@@ -13,6 +13,75 @@ export type DanceType =
   | 'latin_mix'
   | 'other';
 
+// ============ VISIBILITY & DJ MODE ============
+
+// Visibilità evento
+export type EventVisibility = 'public' | 'private' | 'group';
+
+// Modalità DJ
+export type DjMode = 
+  | 'open'      // Chiunque può candidarsi come DJ
+  | 'assigned'  // DJ pre-assegnato, altri possono richiedere
+  | 'none';     // Nessun DJ previsto (campo nascosto)
+
+// Richiesta per diventare DJ
+export interface DjRequest {
+  userId: string;
+  user: Pick<User, 'id' | 'username' | 'displayName' | 'avatarUrl'>;
+  message?: string;
+  requestedAt: Date;
+  status: 'pending' | 'approved' | 'rejected';
+}
+
+// ============ GROUPS ============
+
+// Ruolo nel gruppo
+export type GroupRole = 'admin' | 'member' | 'dj';
+
+// Membro del gruppo
+export interface GroupMember {
+  userId: string;
+  user: Pick<User, 'id' | 'username' | 'displayName' | 'avatarUrl'>;
+  role: GroupRole;
+  joinedAt: Date;
+}
+
+// Invito al gruppo
+export interface GroupInvite {
+  id: string;
+  groupId: string;
+  groupName?: string;
+  invitedUserId: string;
+  invitedByUserId: string;
+  invitedByUser?: Pick<User, 'id' | 'username' | 'displayName'>;
+  status: 'pending' | 'accepted' | 'rejected';
+  createdAt: Date;
+  expiresAt: Date;
+}
+
+// Gruppo
+export interface Group {
+  id: string;
+  name: string;
+  description?: string;
+  imageUrl?: string;
+  members: GroupMember[];
+  memberCount: number;
+  isAdmin: boolean; // computed per l'utente corrente
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface CreateGroupData {
+  name: string;
+  description?: string;
+  imageUrl?: string;
+}
+
+// ============ DANCE TYPES INFO ============
+
+// ============ DANCE TYPES INFO ============
+
 export interface DanceTypeInfo {
   id: DanceType;
   name: string;
@@ -71,8 +140,20 @@ export interface DanceEvent {
   endTime?: string;
   creatorId: string;
   creator: User;
-  djName?: string; // DJ della serata
+  
+  // Visibilità
+  visibility: EventVisibility;
+  groupId?: string; // Solo se visibility === 'group'
+  groupName?: string; // Nome del gruppo (computed)
+  
+  // DJ
+  djMode: DjMode;
+  djName?: string;
   djContact?: string;
+  djUserId?: string;
+  djUser?: User;
+  djRequests: DjRequest[];
+  
   participants: Participant[];
   maxParticipants?: number;
   showParticipantNames: boolean; // se mostrare i nomi o solo il numero
@@ -89,8 +170,17 @@ export interface CreateEventData {
   date: Date;
   startTime: string;
   endTime?: string;
+  
+  // Visibilità
+  visibility: EventVisibility;
+  groupId?: string;
+  
+  // DJ
+  djMode: DjMode;
   djName?: string;
   djContact?: string;
+  djUserId?: string;
+  
   maxParticipants?: number;
   showParticipantNames: boolean;
   imageUrl?: string;
@@ -113,11 +203,19 @@ export type RootStackParamList = {
   CreateEvent: { danceType: DanceType; selectedDate?: string };
   EventDetail: { eventId: string };
   LocationPicker: undefined;
+  
+  // Groups screens
+  Groups: undefined;
+  GroupDetail: { groupId: string };
+  CreateGroup: undefined;
+  GroupMembers: { groupId: string };
+  GroupInvites: undefined;
 };
 
 export type MainTabParamList = {
   Home: undefined;
   MyEvents: undefined;
+  Groups: undefined;
   Profile: undefined;
 };
 

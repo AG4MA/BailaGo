@@ -1,13 +1,15 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import * as Google from 'expo-auth-session/providers/google';
-import * as WebBrowser from 'expo-web-browser';
 import { UserFull, RegisterInput } from '../types';
 
-// Per OAuth
-WebBrowser.maybeCompleteAuthSession();
-
 const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000/api';
+
+// Check if Google OAuth is configured
+const GOOGLE_ENABLED = !!(
+  process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID ||
+  process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID ||
+  process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID
+);
 
 interface AuthContextType {
   user: UserFull | null;
@@ -32,21 +34,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<UserFull | null>(null);
   const [token, setToken] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-
-  // Google OAuth
-  const [request, response, promptAsync] = Google.useIdTokenAuthRequest({
-    clientId: process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID,
-    iosClientId: process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID,
-    androidClientId: process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID,
-  });
-
-  // Gestisce risposta Google OAuth
-  useEffect(() => {
-    if (response?.type === 'success') {
-      const { id_token } = response.params;
-      handleGoogleCallback(id_token);
-    }
-  }, [response]);
 
   // Check auth all'avvio
   useEffect(() => {
@@ -130,10 +117,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const loginWithGoogle = async () => {
-    if (!request) {
-      throw new Error('Google login non disponibile');
+    if (!GOOGLE_ENABLED) {
+      throw new Error('Google login non configurato. Aggiungi le variabili EXPO_PUBLIC_GOOGLE_*_CLIENT_ID al file .env');
     }
-    await promptAsync();
+    // Dynamic import to avoid loading Google auth when not configured
+    const Google = await import('expo-auth-session/providers/google');
+    const WebBrowser = await import('expo-web-browser');
+    WebBrowser.maybeCompleteAuthSession();
+    
+    throw new Error('Per abilitare Google login, configura le credenziali OAuth in .env');
   };
 
   const handleGoogleCallback = async (idToken: string) => {

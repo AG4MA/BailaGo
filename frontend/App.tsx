@@ -1,15 +1,20 @@
 import React from 'react';
 import { StatusBar } from 'expo-status-bar';
-import { AuthProvider, EventsProvider } from './src/contexts';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { AuthProvider, EventsProvider, GroupsProvider } from './src/contexts';
 import { AppNavigator } from './src/navigation';
 
 export default function App() {
   return (
-    <AuthProvider>
-      <EventsProvider>
-        <StatusBar style="auto" />
-        <AppNavigator />
-      </EventsProvider>
-    </AuthProvider>
+    <SafeAreaProvider>
+      <AuthProvider>
+        <GroupsProvider>
+          <EventsProvider>
+            <StatusBar style="auto" />
+            <AppNavigator />
+          </EventsProvider>
+        </GroupsProvider>
+      </AuthProvider>
+    </SafeAreaProvider>
   );
 }

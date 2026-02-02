@@ -1,6 +1,6 @@
 # BailaGo - TODO & Stato Avanzamento Lavori
 
-> Ultimo aggiornamento: 2 Febbraio 2026
+> Ultimo aggiornamento: 2 Febbraio 2026 - Sessione serale
 
 ## 🚀 Quick Start (Development)
 
@@ -9,10 +9,46 @@
 cd backend && npm run dev
 
 # Terminale 2 - Frontend Expo (porta 8081/8082)
-cd frontend && npx expo start
+cd frontend && npx expo start --tunnel
 ```
 
 **Expo Go:** Scansiona il QR code dal terminale con l'app Expo Go
+
+**Account Test:** `test@test.com` / `test`
+
+---
+
+## 🎯 PROSSIME FEATURE DA IMPLEMENTARE
+
+### 1. Sistema Gruppi 🆕
+- [ ] Modello `Group` (id, name, description, admins[], members[], createdAt)
+- [ ] CRUD Gruppi (create, update, delete, list)
+- [ ] Sistema inviti (admin invita → utente accetta/rifiuta)
+- [ ] Ruoli: Admin (può invitare, creare eventi privati, nominare altri admin) / Membro
+- [ ] UI: Lista gruppi, Dettaglio gruppo, Gestione membri
+
+### 2. Visibilità Eventi 🆕
+- [ ] Campo `visibility`: 'public' | 'private' | 'group'
+- [ ] Campo `groupId` (opzionale, per eventi di gruppo)
+- [ ] Filtro eventi in base alla visibilità
+- [ ] Eventi privati condivisibili solo da admin gruppo
+- [ ] UI: Selezione visibilità in CreateEventScreen
+
+### 3. Sistema DJ Migliorato 🆕
+- [ ] Campo `djMode`: 'open' | 'assigned' | 'none'
+  - `open`: Chiunque può candidarsi come DJ
+  - `assigned`: DJ pre-assegnato, altri possono chiedere di sostituire
+  - `none`: Nessun DJ previsto (campo nascosto)
+- [ ] Campo `djRequests`: lista richieste per diventare DJ
+- [ ] UI: Pulsante "Candidati come DJ" / "Richiedi ruolo DJ"
+- [ ] Notifica al creatore per approvare richieste DJ
+
+### 4. Ricerca e Filtri 🆕
+- [ ] Ricerca per città
+- [ ] Filtro per tipo di ballo
+- [ ] Calendario generale (tutti gli eventi visibili)
+- [ ] Combinazione filtri (città + tipo ballo + data)
+- [ ] UI: Barra ricerca, Filtri dropdown
 
 ---
 

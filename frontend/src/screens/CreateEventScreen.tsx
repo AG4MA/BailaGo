@@ -4,13 +4,13 @@ import {
   Text,
   StyleSheet,
   ScrollView,
-  SafeAreaView,
   TouchableOpacity,
   Switch,
   Alert,
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RouteProp } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
@@ -86,7 +86,9 @@ export function CreateEventScreen({ navigation, route }: CreateEventScreenProps)
     };
 
     try {
+      console.log('[CreateEventScreen] Creating event:', eventData);
       const newEvent = await createEvent(eventData);
+      console.log('[CreateEventScreen] Event created:', newEvent.id);
       Alert.alert(
         'Evento creato! 🎉',
         'Il tuo evento è stato creato con successo. Vuoi condividerlo?',
@@ -99,7 +101,8 @@ export function CreateEventScreen({ navigation, route }: CreateEventScreenProps)
         ]
       );
     } catch (error) {
-      Alert.alert('Errore', 'Impossibile creare l\'evento. Riprova.');
+      console.error('[CreateEventScreen] Error creating event:', error);
+      Alert.alert('Errore', `Impossibile creare l'evento: ${error instanceof Error ? error.message : 'Errore sconosciuto'}`);
     }
   };
 

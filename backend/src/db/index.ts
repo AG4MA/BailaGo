@@ -1,7 +1,11 @@
 import { v4 as uuidv4 } from 'uuid';
 import crypto from 'crypto';
 import bcrypt from 'bcryptjs';
-import { User, UserCreateInput, DanceEvent, CreateEventInput, Participant, AuthProvider, OAuthLoginInput } from '../types/index.js';
+import { 
+  User, UserCreateInput, DanceEvent, CreateEventInput, Participant, 
+  AuthProvider, OAuthLoginInput, Group, CreateGroupInput, GroupMember,
+  GroupInvite, DjRequest
+} from '../types/index.js';
 
 // Tipo interno per utente con password
 export type UserWithPassword = User & { password?: string };
@@ -9,6 +13,8 @@ export type UserWithPassword = User & { password?: string };
 // In-memory storage (sostituire con database reale in produzione)
 const users: Map<string, UserWithPassword> = new Map();
 const events: Map<string, DanceEvent> = new Map();
+const groups: Map<string, Group> = new Map();
+const groupInvites: Map<string, GroupInvite> = new Map();
 
 // Helper per generare token sicuri
 const generateToken = (): string => crypto.randomBytes(32).toString('hex');
@@ -32,7 +38,27 @@ const seedUser: UserWithPassword = {
   updatedAt: new Date(),
 };
 
+// Test user - credentials: test@test.com / test
+const testUser: UserWithPassword = {
+  id: '2',
+  username: 'test',
+  nickname: 'test',
+  firstName: 'Test',
+  lastName: 'User',
+  email: 'test@test.com',
+  emailVerified: true,
+  displayName: 'Test User',
+  bio: 'Account di test',
+  favoriteDances: ['salsa'],
+  password: bcrypt.hashSync('test', 10),
+  provider: 'local',
+  pushEnabled: true,
+  createdAt: new Date(),
+  updatedAt: new Date(),
+};
+
 users.set(seedUser.id, seedUser);
+users.set(testUser.id, testUser);
 
 // User functions
 export const db = {
@@ -210,8 +236,22 @@ export const db = {
 
   // Events
   events: {
-    findAll: (filters?: { danceType?: string; city?: string }): DanceEvent[] => {
+    findAll: (filters?: { danceType?: string; city?: string; visibility?: string; groupIds?: string[]; userId?: string }): DanceEvent[] => {
       let result = Array.from(events.values());
+      
+      // Filtro per visibilità (solo eventi pubblici, o privati se l'utente è il creatore, o di gruppo se membro)
+      if (filters?.userId) {
+        result = result.filter(e => {
+          if (e.visibility === 'public') return true;
+          if (e.visibility === 'private' && e.creatorId === filters.userId) return true;
+          if (e.visibility === 'group' && e.groupId && filters.groupIds?.includes(e.groupId)) return true;
+          if (e.creatorId === filters.userId) return true; // creatore vede sempre i suoi
+          return false;
+        });
+      } else {
+        // Utente non autenticato vede solo pubblici
+        result = result.filter(e => e.visibility === 'public');
+      }
       
       if (filters?.danceType) {
         result = result.filter(e => e.danceType === filters.danceType);
@@ -240,8 +280,12 @@ export const db = {
     create: (input: CreateEventInput, creator: User): DanceEvent => {
       const event: DanceEvent = {
         id: uuidv4(),
-        ...input,
+        title: input.title,
+        description: input.description,
+        danceType: input.danceType,
         date: new Date(input.date),
+        startTime: input.startTime,
+        endTime: input.endTime,
         location: { ...input.location, id: uuidv4() },
         creatorId: creator.id,
         creator: {
@@ -250,8 +294,21 @@ export const db = {
           displayName: creator.displayName,
           avatarUrl: creator.avatarUrl,
         },
+        // Visibility
+        visibility: input.visibility || 'public',
+        groupId: input.groupId,
+        // DJ
+        djMode: input.djMode || 'open',
+        djName: input.djName,
+        djContact: input.djContact,
+        djUserId: input.djUserId,
+        djRequests: [],
+        // Participants
         participants: [],
         participantCount: 0,
+        maxParticipants: input.maxParticipants,
+        showParticipantNames: input.showParticipantNames,
+        imageUrl: input.imageUrl,
         createdAt: new Date(),
         updatedAt: new Date(),
       };
@@ -321,6 +378,279 @@ export const db = {
       event.updatedAt = new Date();
       events.set(eventId, event);
       return event;
+    },
+
+    // DJ Requests
+    addDjRequest: (eventId: string, user: User, message?: string): DanceEvent | undefined => {
+      const event = events.get(eventId);
+      if (!event) return undefined;
+      if (event.djMode === 'none') return undefined;
+      
+      // Check if already requested
+      if (event.djRequests.some(r => r.userId === user.id)) {
+        return event;
+      }
+
+      const request: DjRequest = {
+        userId: user.id,
+        user: {
+          id: user.id,
+          username: user.username,
+          displayName: user.displayName,
+          avatarUrl: user.avatarUrl,
+        },
+        message,
+        requestedAt: new Date(),
+        status: 'pending',
+      };
+
+      event.djRequests.push(request);
+      event.updatedAt = new Date();
+      events.set(eventId, event);
+      return event;
+    },
+
+    approveDjRequest: (eventId: string, userId: string): DanceEvent | undefined => {
+      const event = events.get(eventId);
+      if (!event) return undefined;
+
+      const request = event.djRequests.find(r => r.userId === userId);
+      if (!request) return undefined;
+
+      // Approve this request, reject others
+      event.djRequests = event.djRequests.map(r => ({
+        ...r,
+        status: r.userId === userId ? 'approved' : 'rejected',
+      }));
+
+      // Set as DJ
+      event.djUserId = userId;
+      event.djName = request.user.displayName;
+      event.updatedAt = new Date();
+      events.set(eventId, event);
+      return event;
+    },
+
+    rejectDjRequest: (eventId: string, userId: string): DanceEvent | undefined => {
+      const event = events.get(eventId);
+      if (!event) return undefined;
+
+      event.djRequests = event.djRequests.map(r => 
+        r.userId === userId ? { ...r, status: 'rejected' as const } : r
+      );
+      event.updatedAt = new Date();
+      events.set(eventId, event);
+      return event;
+    },
+  },
+
+  // Groups
+  groups: {
+    findAll: (userId?: string): Group[] => {
+      let result = Array.from(groups.values());
+      if (userId) {
+        result = result.filter(g => g.members.some(m => m.userId === userId));
+      }
+      return result.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+    },
+
+    findById: (id: string): Group | undefined => {
+      return groups.get(id);
+    },
+
+    findByMember: (userId: string): Group[] => {
+      return Array.from(groups.values()).filter(g => 
+        g.members.some(m => m.userId === userId)
+      );
+    },
+
+    create: (input: CreateGroupInput, creator: User): Group => {
+      const group: Group = {
+        id: uuidv4(),
+        name: input.name,
+        description: input.description,
+        imageUrl: input.imageUrl,
+        members: [{
+          userId: creator.id,
+          user: {
+            id: creator.id,
+            username: creator.username,
+            displayName: creator.displayName,
+            avatarUrl: creator.avatarUrl,
+          },
+          role: 'admin',
+          joinedAt: new Date(),
+        }],
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+      groups.set(group.id, group);
+      return group;
+    },
+
+    update: (id: string, updates: Partial<CreateGroupInput>): Group | undefined => {
+      const group = groups.get(id);
+      if (!group) return undefined;
+      
+      const updated: Group = {
+        ...group,
+        ...updates,
+        updatedAt: new Date(),
+      };
+      groups.set(id, updated);
+      return updated;
+    },
+
+    delete: (id: string): boolean => {
+      // Also delete all events of this group
+      Array.from(events.values())
+        .filter(e => e.groupId === id)
+        .forEach(e => events.delete(e.id));
+      
+      // Delete pending invites
+      Array.from(groupInvites.values())
+        .filter(i => i.groupId === id)
+        .forEach(i => groupInvites.delete(i.id));
+      
+      return groups.delete(id);
+    },
+
+    addMember: (groupId: string, user: User, role: 'admin' | 'member' | 'dj' = 'member'): Group | undefined => {
+      const group = groups.get(groupId);
+      if (!group) return undefined;
+      
+      // Check if already member
+      if (group.members.some(m => m.userId === user.id)) {
+        return group;
+      }
+
+      const member: GroupMember = {
+        userId: user.id,
+        user: {
+          id: user.id,
+          username: user.username,
+          displayName: user.displayName,
+          avatarUrl: user.avatarUrl,
+        },
+        role,
+        joinedAt: new Date(),
+      };
+
+      group.members.push(member);
+      group.updatedAt = new Date();
+      groups.set(groupId, group);
+      return group;
+    },
+
+    removeMember: (groupId: string, userId: string): Group | undefined => {
+      const group = groups.get(groupId);
+      if (!group) return undefined;
+
+      // Can't remove last admin
+      const admins = group.members.filter(m => m.role === 'admin');
+      const isAdmin = admins.some(a => a.userId === userId);
+      if (isAdmin && admins.length === 1) {
+        return undefined; // Can't remove last admin
+      }
+
+      group.members = group.members.filter(m => m.userId !== userId);
+      group.updatedAt = new Date();
+      groups.set(groupId, group);
+      return group;
+    },
+
+    updateMemberRole: (groupId: string, userId: string, role: 'admin' | 'member' | 'dj'): Group | undefined => {
+      const group = groups.get(groupId);
+      if (!group) return undefined;
+
+      // Can't demote last admin
+      if (role !== 'admin') {
+        const admins = group.members.filter(m => m.role === 'admin');
+        const isCurrentlyAdmin = admins.some(a => a.userId === userId);
+        if (isCurrentlyAdmin && admins.length === 1) {
+          return undefined;
+        }
+      }
+
+      group.members = group.members.map(m => 
+        m.userId === userId ? { ...m, role } : m
+      );
+      group.updatedAt = new Date();
+      groups.set(groupId, group);
+      return group;
+    },
+
+    isAdmin: (groupId: string, userId: string): boolean => {
+      const group = groups.get(groupId);
+      if (!group) return false;
+      return group.members.some(m => m.userId === userId && m.role === 'admin');
+    },
+
+    isMember: (groupId: string, userId: string): boolean => {
+      const group = groups.get(groupId);
+      if (!group) return false;
+      return group.members.some(m => m.userId === userId);
+    },
+  },
+
+  // Group Invites
+  invites: {
+    findByUser: (userId: string): GroupInvite[] => {
+      return Array.from(groupInvites.values())
+        .filter(i => i.invitedUserId === userId && i.status === 'pending');
+    },
+
+    findByGroup: (groupId: string): GroupInvite[] => {
+      return Array.from(groupInvites.values())
+        .filter(i => i.groupId === groupId);
+    },
+
+    findById: (id: string): GroupInvite | undefined => {
+      return groupInvites.get(id);
+    },
+
+    create: (groupId: string, invitedUserId: string, invitedByUserId: string): GroupInvite => {
+      // Check if invite already exists
+      const existing = Array.from(groupInvites.values()).find(
+        i => i.groupId === groupId && i.invitedUserId === invitedUserId && i.status === 'pending'
+      );
+      if (existing) return existing;
+
+      const invite: GroupInvite = {
+        id: uuidv4(),
+        groupId,
+        invitedUserId,
+        invitedByUserId,
+        status: 'pending',
+        createdAt: new Date(),
+        expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days
+      };
+      groupInvites.set(invite.id, invite);
+      return invite;
+    },
+
+    accept: (inviteId: string): GroupInvite | undefined => {
+      const invite = groupInvites.get(inviteId);
+      if (!invite) return undefined;
+      if (invite.status !== 'pending') return undefined;
+      if (invite.expiresAt < new Date()) return undefined;
+
+      invite.status = 'accepted';
+      groupInvites.set(inviteId, invite);
+      return invite;
+    },
+
+    reject: (inviteId: string): GroupInvite | undefined => {
+      const invite = groupInvites.get(inviteId);
+      if (!invite) return undefined;
+
+      invite.status = 'rejected';
+      groupInvites.set(inviteId, invite);
+      return invite;
+    },
+
+    delete: (id: string): boolean => {
+      return groupInvites.delete(id);
     },
   },
 };

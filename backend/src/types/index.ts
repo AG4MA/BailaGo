@@ -16,6 +16,77 @@ export type DanceType =
 // Provider di autenticazione
 export type AuthProvider = 'local' | 'google' | 'instagram';
 
+// ============ VISIBILITY & DJ MODE ============
+
+// Visibilità evento
+export type EventVisibility = 'public' | 'private' | 'group';
+
+// Modalità DJ
+export type DjMode = 
+  | 'open'      // Chiunque può candidarsi come DJ
+  | 'assigned'  // DJ pre-assegnato, altri possono richiedere
+  | 'none';     // Nessun DJ previsto (campo nascosto)
+
+// Richiesta per diventare DJ
+export interface DjRequest {
+  userId: string;
+  user: Pick<User, 'id' | 'username' | 'displayName' | 'avatarUrl'>;
+  message?: string;
+  requestedAt: Date;
+  status: 'pending' | 'approved' | 'rejected';
+}
+
+// ============ GROUPS ============
+
+// Ruolo nel gruppo
+export type GroupRole = 'admin' | 'member' | 'dj';
+
+// Membro del gruppo
+export interface GroupMember {
+  userId: string;
+  user: Pick<User, 'id' | 'username' | 'displayName' | 'avatarUrl'>;
+  role: GroupRole;
+  joinedAt: Date;
+}
+
+// Invito al gruppo
+export interface GroupInvite {
+  id: string;
+  groupId: string;
+  invitedUserId: string;
+  invitedByUserId: string;
+  status: 'pending' | 'accepted' | 'rejected';
+  createdAt: Date;
+  expiresAt: Date;
+}
+
+// Gruppo
+export interface Group {
+  id: string;
+  name: string;
+  description?: string;
+  imageUrl?: string;
+  members: GroupMember[];
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface CreateGroupInput {
+  name: string;
+  description?: string;
+  imageUrl?: string;
+}
+
+export interface UpdateGroupInput extends Partial<CreateGroupInput> {}
+
+export interface InviteToGroupInput {
+  userId: string;
+}
+
+// ============ LOCATION ============
+
+// ============ LOCATION ============
+
 export interface Location {
   id: string;
   name: string;
@@ -108,8 +179,18 @@ export interface DanceEvent {
   endTime?: string;
   creatorId: string;
   creator: Pick<User, 'id' | 'username' | 'displayName' | 'avatarUrl'>;
+  
+  // Visibilità
+  visibility: EventVisibility;
+  groupId?: string; // Solo se visibility === 'group'
+  
+  // DJ
+  djMode: DjMode;
   djName?: string;
   djContact?: string;
+  djUserId?: string; // Se DJ è un utente registrato
+  djRequests: DjRequest[]; // Richieste per diventare DJ
+  
   participants: Participant[];
   participantCount: number;
   maxParticipants?: number;
@@ -127,8 +208,17 @@ export interface CreateEventInput {
   date: string;
   startTime: string;
   endTime?: string;
+  
+  // Visibilità
+  visibility?: EventVisibility; // default: 'public'
+  groupId?: string;
+  
+  // DJ
+  djMode?: DjMode; // default: 'open'
   djName?: string;
   djContact?: string;
+  djUserId?: string;
+  
   maxParticipants?: number;
   showParticipantNames: boolean;
   imageUrl?: string;
