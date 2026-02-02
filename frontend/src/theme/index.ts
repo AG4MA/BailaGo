@@ -1,12 +1,14 @@
 export const colors = {
   primary: '#E84393',
   primaryDark: '#C73883',
+  primaryLight: '#F8E1EC',
   secondary: '#6C5CE7',
   accent: '#00CEC9',
   
   background: '#FFFFFF',
   backgroundSecondary: '#F8F9FA',
   backgroundDark: '#1A1A2E',
+  surface: '#F5F5F5',
   
   text: '#2D3436',
   textSecondary: '#636E72',

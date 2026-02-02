@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   View,
   Text,
@@ -6,11 +6,12 @@ import {
   ScrollView,
   TouchableOpacity,
   StatusBar,
+  TextInput,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
-import { RootStackParamList, DANCE_TYPES } from '../types';
+import { RootStackParamList, DANCE_TYPES, DanceType } from '../types';
 import { useAuth, useEvents } from '../contexts';
 import { EventCard, DanceTypeCard, Button } from '../components';
 import { colors, spacing, typography, shadows, borderRadius } from '../theme';
@@ -24,12 +25,30 @@ interface HomeScreenProps {
 export function HomeScreen({ navigation }: HomeScreenProps) {
   const { user } = useAuth();
   const { events } = useEvents();
+  
+  // Stati per ricerca e filtri
+  const [searchCity, setSearchCity] = useState('');
+  const [selectedDanceFilter, setSelectedDanceFilter] = useState<DanceType | null>(null);
+
+  // Filtra eventi
+  const filteredEvents = useMemo(() => {
+    let result = events.filter(e => new Date(e.date) >= new Date());
+    
+    if (searchCity.trim()) {
+      result = result.filter(e => 
+        e.location.city.toLowerCase().includes(searchCity.toLowerCase())
+      );
+    }
+    
+    if (selectedDanceFilter) {
+      result = result.filter(e => e.danceType === selectedDanceFilter);
+    }
+    
+    return result.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+  }, [events, searchCity, selectedDanceFilter]);
 
   // Prossimi eventi (ordina per data)
-  const upcomingEvents = events
-    .filter(e => new Date(e.date) >= new Date())
-    .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
-    .slice(0, 5);
+  const upcomingEvents = filteredEvents.slice(0, 10);
 
   const handleDanceTypePress = (danceTypeId: string) => {
     navigation.navigate('EventCalendar', { danceType: danceTypeId as any });
@@ -77,6 +96,59 @@ export function HomeScreen({ navigation }: HomeScreenProps) {
           </View>
           <Ionicons name="arrow-forward-circle" size={32} color={colors.textWhite} />
         </TouchableOpacity>
+
+        {/* Search Bar */}
+        <View style={styles.searchSection}>
+          <View style={styles.searchBar}>
+            <Ionicons name="search" size={20} color={colors.textSecondary} />
+            <TextInput
+              style={styles.searchInput}
+              placeholder="Cerca per città..."
+              placeholderTextColor={colors.textSecondary}
+              value={searchCity}
+              onChangeText={setSearchCity}
+            />
+            {searchCity.length > 0 && (
+              <TouchableOpacity onPress={() => setSearchCity('')}>
+                <Ionicons name="close-circle" size={20} color={colors.textSecondary} />
+              </TouchableOpacity>
+            )}
+          </View>
+          
+          {/* Dance Filter Chips */}
+          <ScrollView 
+            horizontal 
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.filterChipsContainer}
+          >
+            <TouchableOpacity
+              style={[styles.filterChip, !selectedDanceFilter && styles.filterChipSelected]}
+              onPress={() => setSelectedDanceFilter(null)}
+            >
+              <Text style={[styles.filterChipText, !selectedDanceFilter && styles.filterChipTextSelected]}>
+                Tutti
+              </Text>
+            </TouchableOpacity>
+            {DANCE_TYPES.slice(0, 8).map((dt) => (
+              <TouchableOpacity
+                key={dt.id}
+                style={[
+                  styles.filterChip, 
+                  selectedDanceFilter === dt.id && { backgroundColor: dt.color }
+                ]}
+                onPress={() => setSelectedDanceFilter(selectedDanceFilter === dt.id ? null : dt.id)}
+              >
+                <Text style={styles.filterChipEmoji}>{dt.emoji}</Text>
+                <Text style={[
+                  styles.filterChipText,
+                  selectedDanceFilter === dt.id && styles.filterChipTextSelected
+                ]}>
+                  {dt.name}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        </View>
 
         {/* Dance Types */}
         <View style={styles.section}>
@@ -272,5 +344,61 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
     textAlign: 'center',
     marginBottom: spacing.lg,
+  },
+  
+  // Search styles
+  searchSection: {
+    marginTop: spacing.md,
+  },
+  
+  searchBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.backgroundSecondary,
+    marginHorizontal: spacing.lg,
+    paddingHorizontal: spacing.md,
+    borderRadius: borderRadius.md,
+    gap: spacing.sm,
+  },
+  
+  searchInput: {
+    flex: 1,
+    paddingVertical: spacing.sm + 4,
+    ...typography.body,
+    color: colors.text,
+  },
+  
+  filterChipsContainer: {
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+    gap: spacing.sm,
+  },
+  
+  filterChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.backgroundSecondary,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderRadius: borderRadius.lg,
+    gap: spacing.xs,
+  },
+  
+  filterChipSelected: {
+    backgroundColor: colors.primary,
+  },
+  
+  filterChipEmoji: {
+    fontSize: 14,
+  },
+  
+  filterChipText: {
+    ...typography.bodySmall,
+    color: colors.text,
+    fontWeight: '500',
+  },
+  
+  filterChipTextSelected: {
+    color: '#fff',
   },
 });

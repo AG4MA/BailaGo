@@ -16,8 +16,8 @@ import { RouteProp } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { format, parse } from 'date-fns';
 import { it } from 'date-fns/locale';
-import { RootStackParamList, DANCE_TYPES, CreateEventData, Location } from '../types';
-import { useEvents } from '../contexts';
+import { RootStackParamList, DANCE_TYPES, CreateEventData, Location, EventVisibility, DjMode } from '../types';
+import { useEvents, useGroups } from '../contexts';
 import { Button, Input } from '../components';
 import { colors, spacing, typography, borderRadius, shadows } from '../theme';
 
@@ -32,8 +32,12 @@ interface CreateEventScreenProps {
 export function CreateEventScreen({ navigation, route }: CreateEventScreenProps) {
   const { danceType, selectedDate } = route.params;
   const { createEvent, isLoading } = useEvents();
+  const { groups } = useGroups();
   
   const danceInfo = DANCE_TYPES.find(d => d.id === danceType);
+  
+  // Gruppi dove l'utente è admin
+  const adminGroups = groups.filter(g => g.isAdmin);
 
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
@@ -45,6 +49,11 @@ export function CreateEventScreen({ navigation, route }: CreateEventScreenProps)
   const [djName, setDjName] = useState('');
   const [maxParticipants, setMaxParticipants] = useState('');
   const [showParticipantNames, setShowParticipantNames] = useState(true);
+  
+  // Nuovi stati per visibilità e DJ
+  const [visibility, setVisibility] = useState<EventVisibility>('public');
+  const [selectedGroupId, setSelectedGroupId] = useState<string | undefined>();
+  const [djMode, setDjMode] = useState<DjMode>('open');
 
   const eventDate = selectedDate 
     ? parse(selectedDate, 'yyyy-MM-dd', new Date())
@@ -64,6 +73,10 @@ export function CreateEventScreen({ navigation, route }: CreateEventScreenProps)
       Alert.alert('Errore', 'Inserisci la città');
       return;
     }
+    if (visibility === 'group' && !selectedGroupId) {
+      Alert.alert('Errore', 'Seleziona un gruppo per l\'evento');
+      return;
+    }
 
     const location: Location = {
       id: Date.now().toString(),
@@ -80,7 +93,10 @@ export function CreateEventScreen({ navigation, route }: CreateEventScreenProps)
       date: eventDate,
       startTime,
       endTime: endTime || undefined,
-      djName: djName || undefined,
+      visibility,
+      groupId: visibility === 'group' ? selectedGroupId : undefined,
+      djMode,
+      djName: djMode !== 'none' ? djName || undefined : undefined,
       maxParticipants: maxParticipants ? parseInt(maxParticipants, 10) : undefined,
       showParticipantNames,
     };
@@ -146,6 +162,87 @@ export function CreateEventScreen({ navigation, route }: CreateEventScreenProps)
               style={styles.textArea}
             />
 
+            {/* Visibilità */}
+            <Text style={styles.sectionTitle}>👁️ Visibilità evento</Text>
+            
+            <View style={styles.optionGroup}>
+              <TouchableOpacity
+                style={[styles.optionButton, visibility === 'public' && styles.optionButtonSelected]}
+                onPress={() => setVisibility('public')}
+              >
+                <Ionicons 
+                  name="globe-outline" 
+                  size={22} 
+                  color={visibility === 'public' ? '#fff' : colors.text} 
+                />
+                <Text style={[styles.optionText, visibility === 'public' && styles.optionTextSelected]}>
+                  Pubblico
+                </Text>
+                <Text style={[styles.optionHint, visibility === 'public' && styles.optionHintSelected]}>
+                  Visibile a tutti
+                </Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity
+                style={[styles.optionButton, visibility === 'private' && styles.optionButtonSelected]}
+                onPress={() => setVisibility('private')}
+              >
+                <Ionicons 
+                  name="lock-closed-outline" 
+                  size={22} 
+                  color={visibility === 'private' ? '#fff' : colors.text} 
+                />
+                <Text style={[styles.optionText, visibility === 'private' && styles.optionTextSelected]}>
+                  Privato
+                </Text>
+                <Text style={[styles.optionHint, visibility === 'private' && styles.optionHintSelected]}>
+                  Solo tu lo vedi
+                </Text>
+              </TouchableOpacity>
+              
+              {adminGroups.length > 0 && (
+                <TouchableOpacity
+                  style={[styles.optionButton, visibility === 'group' && styles.optionButtonSelected]}
+                  onPress={() => setVisibility('group')}
+                >
+                  <Ionicons 
+                    name="people-outline" 
+                    size={22} 
+                    color={visibility === 'group' ? '#fff' : colors.text} 
+                  />
+                  <Text style={[styles.optionText, visibility === 'group' && styles.optionTextSelected]}>
+                    Gruppo
+                  </Text>
+                  <Text style={[styles.optionHint, visibility === 'group' && styles.optionHintSelected]}>
+                    Solo membri gruppo
+                  </Text>
+                </TouchableOpacity>
+              )}
+            </View>
+            
+            {visibility === 'group' && adminGroups.length > 0 && (
+              <View style={styles.groupSelector}>
+                <Text style={styles.subLabel}>Seleziona gruppo:</Text>
+                {adminGroups.map(group => (
+                  <TouchableOpacity
+                    key={group.id}
+                    style={[
+                      styles.groupOption,
+                      selectedGroupId === group.id && styles.groupOptionSelected
+                    ]}
+                    onPress={() => setSelectedGroupId(group.id)}
+                  >
+                    <Ionicons 
+                      name={selectedGroupId === group.id ? 'checkmark-circle' : 'ellipse-outline'} 
+                      size={22} 
+                      color={selectedGroupId === group.id ? danceInfo?.color : colors.textLight} 
+                    />
+                    <Text style={styles.groupOptionText}>{group.name}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            )}
+
             {/* Luogo */}
             <Text style={styles.sectionTitle}>📍 Luogo</Text>
             
@@ -198,13 +295,68 @@ export function CreateEventScreen({ navigation, route }: CreateEventScreenProps)
             {/* DJ */}
             <Text style={styles.sectionTitle}>🎧 DJ della serata</Text>
             
-            <Input
-              label="Nome DJ (opzionale)"
-              placeholder="Chi si occupa della musica?"
-              value={djName}
-              onChangeText={setDjName}
-              leftIcon={<Ionicons name="musical-notes" size={20} color={colors.textSecondary} />}
-            />
+            <View style={styles.optionGroup}>
+              <TouchableOpacity
+                style={[styles.optionButton, djMode === 'open' && styles.optionButtonSelected]}
+                onPress={() => setDjMode('open')}
+              >
+                <Ionicons 
+                  name="hand-right-outline" 
+                  size={22} 
+                  color={djMode === 'open' ? '#fff' : colors.text} 
+                />
+                <Text style={[styles.optionText, djMode === 'open' && styles.optionTextSelected]}>
+                  Aperto
+                </Text>
+                <Text style={[styles.optionHint, djMode === 'open' && styles.optionHintSelected]}>
+                  Chiunque può candidarsi
+                </Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity
+                style={[styles.optionButton, djMode === 'assigned' && styles.optionButtonSelected]}
+                onPress={() => setDjMode('assigned')}
+              >
+                <Ionicons 
+                  name="person-outline" 
+                  size={22} 
+                  color={djMode === 'assigned' ? '#fff' : colors.text} 
+                />
+                <Text style={[styles.optionText, djMode === 'assigned' && styles.optionTextSelected]}>
+                  Assegnato
+                </Text>
+                <Text style={[styles.optionHint, djMode === 'assigned' && styles.optionHintSelected]}>
+                  DJ già scelto
+                </Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity
+                style={[styles.optionButton, djMode === 'none' && styles.optionButtonSelected]}
+                onPress={() => setDjMode('none')}
+              >
+                <Ionicons 
+                  name="close-circle-outline" 
+                  size={22} 
+                  color={djMode === 'none' ? '#fff' : colors.text} 
+                />
+                <Text style={[styles.optionText, djMode === 'none' && styles.optionTextSelected]}>
+                  Nessuno
+                </Text>
+                <Text style={[styles.optionHint, djMode === 'none' && styles.optionHintSelected]}>
+                  Niente DJ
+                </Text>
+              </TouchableOpacity>
+            </View>
+            
+            {djMode !== 'none' && (
+              <Input
+                label={djMode === 'assigned' ? "Nome DJ *" : "Nome DJ (opzionale)"}
+                placeholder={djMode === 'open' ? "Lascia vuoto se ancora da definire" : "Chi si occupa della musica?"}
+                value={djName}
+                onChangeText={setDjName}
+                leftIcon={<Ionicons name="musical-notes" size={20} color={colors.textSecondary} />}
+              />
+            )}
 
             {/* Impostazioni */}
             <Text style={styles.sectionTitle}>⚙️ Impostazioni</Text>
@@ -352,5 +504,78 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: colors.border,
     backgroundColor: colors.background,
+  },
+  
+  // Option buttons for visibility and DJ mode
+  optionGroup: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+    marginBottom: spacing.md,
+  },
+  
+  optionButton: {
+    flex: 1,
+    backgroundColor: colors.backgroundSecondary,
+    borderRadius: borderRadius.md,
+    padding: spacing.md,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  
+  optionButtonSelected: {
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
+  },
+  
+  optionText: {
+    ...typography.body,
+    color: colors.text,
+    fontWeight: '600',
+    marginTop: spacing.xs,
+  },
+  
+  optionTextSelected: {
+    color: '#fff',
+  },
+  
+  optionHint: {
+    ...typography.caption,
+    color: colors.textSecondary,
+    textAlign: 'center',
+    marginTop: 2,
+  },
+  
+  optionHintSelected: {
+    color: 'rgba(255,255,255,0.8)',
+  },
+  
+  // Group selector
+  groupSelector: {
+    backgroundColor: colors.backgroundSecondary,
+    borderRadius: borderRadius.md,
+    padding: spacing.md,
+    marginBottom: spacing.md,
+  },
+  
+  subLabel: {
+    ...typography.caption,
+    color: colors.textSecondary,
+    marginBottom: spacing.sm,
+  },
+  
+  groupOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: spacing.sm,
+    gap: spacing.sm,
+  },
+  
+  groupOptionSelected: {},
+  
+  groupOptionText: {
+    ...typography.body,
+    color: colors.text,
+    flex: 1,
   },
 });

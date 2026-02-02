@@ -5,3 +5,6 @@ export { CreateEventScreen } from './CreateEventScreen';
 export { EventDetailScreen } from './EventDetailScreen';
 export { MyEventsScreen } from './MyEventsScreen';
 export { ProfileScreen } from './ProfileScreen';
+export { GroupsScreen } from './GroupsScreen';
+export { CreateGroupScreen } from './CreateGroupScreen';
+export { GroupDetailScreen } from './GroupDetailScreen';

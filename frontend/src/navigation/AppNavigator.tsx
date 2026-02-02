@@ -13,6 +13,9 @@ import {
   EventDetailScreen,
   MyEventsScreen,
   ProfileScreen,
+  GroupsScreen,
+  CreateGroupScreen,
+  GroupDetailScreen,
 } from '../screens';
 import {
   LoginScreen,
@@ -38,6 +41,8 @@ function MainTabs() {
             iconName = focused ? 'home' : 'home-outline';
           } else if (route.name === 'MyEvents') {
             iconName = focused ? 'calendar' : 'calendar-outline';
+          } else if (route.name === 'Groups') {
+            iconName = focused ? 'people' : 'people-outline';
           } else if (route.name === 'Profile') {
             iconName = focused ? 'person' : 'person-outline';
           } else {
@@ -70,7 +75,12 @@ function MainTabs() {
       <Tab.Screen 
         name="MyEvents" 
         component={MyEventsScreen}
-        options={{ tabBarLabel: 'I miei eventi' }}
+        options={{ tabBarLabel: 'I miei' }}
+      />
+      <Tab.Screen 
+        name="Groups" 
+        component={GroupsScreen}
+        options={{ tabBarLabel: 'Gruppi' }}
       />
       <Tab.Screen 
         name="Profile" 
@@ -176,6 +186,16 @@ export function AppNavigator() {
                 headerTransparent: true,
                 headerTintColor: colors.textWhite,
               }}
+            />
+            <Stack.Screen 
+              name="CreateGroup" 
+              component={CreateGroupScreen}
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen 
+              name="GroupDetail" 
+              component={GroupDetailScreen}
+              options={{ headerShown: false }}
             />
             <Stack.Screen 
               name="VerifyEmail" 

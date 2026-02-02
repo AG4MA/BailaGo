@@ -1,6 +1,6 @@
 # BailaGo - TODO & Stato Avanzamento Lavori
 
-> Ultimo aggiornamento: 2 Febbraio 2026 - Sessione serale
+> Ultimo aggiornamento: 2 Febbraio 2026 - Sessione serale (AGGIORNATO)
 
 ## 🚀 Quick Start (Development)
 
@@ -18,39 +18,40 @@ cd frontend && npx expo start --tunnel
 
 ---
 
-## 🎯 PROSSIME FEATURE DA IMPLEMENTARE
+## ✅ FEATURE IMPLEMENTATE STASERA
 
-### 1. Sistema Gruppi 🆕
-- [ ] Modello `Group` (id, name, description, admins[], members[], createdAt)
-- [ ] CRUD Gruppi (create, update, delete, list)
-- [ ] Sistema inviti (admin invita → utente accetta/rifiuta)
-- [ ] Ruoli: Admin (può invitare, creare eventi privati, nominare altri admin) / Membro
-- [ ] UI: Lista gruppi, Dettaglio gruppo, Gestione membri
+### 1. Sistema Gruppi ✅ COMPLETATO
+- [x] Modello `Group` (id, name, description, members[], createdAt)
+- [x] CRUD Gruppi (create, update, delete, list)
+- [x] Sistema inviti (admin invita → utente accetta/rifiuta)
+- [x] Ruoli: Admin / Member / DJ
+- [x] UI: GroupsScreen, CreateGroupScreen, GroupDetailScreen
+- [x] Tab Gruppi nella bottom navigation
 
-### 2. Visibilità Eventi 🆕
-- [ ] Campo `visibility`: 'public' | 'private' | 'group'
-- [ ] Campo `groupId` (opzionale, per eventi di gruppo)
-- [ ] Filtro eventi in base alla visibilità
-- [ ] Eventi privati condivisibili solo da admin gruppo
-- [ ] UI: Selezione visibilità in CreateEventScreen
+### 2. Visibilità Eventi ✅ COMPLETATO
+- [x] Campo `visibility`: 'public' | 'private' | 'group'
+- [x] Campo `groupId` (opzionale, per eventi di gruppo)
+- [x] Filtro eventi in base alla visibilità
+- [x] Solo admin gruppo possono creare eventi di gruppo
+- [x] UI: Selezione visibilità in CreateEventScreen
 
-### 3. Sistema DJ Migliorato 🆕
-- [ ] Campo `djMode`: 'open' | 'assigned' | 'none'
+### 3. Sistema DJ Migliorato ✅ COMPLETATO
+- [x] Campo `djMode`: 'open' | 'assigned' | 'none'
   - `open`: Chiunque può candidarsi come DJ
-  - `assigned`: DJ pre-assegnato, altri possono chiedere di sostituire
+  - `assigned`: DJ pre-assegnato, altri possono chiedere di sostituire  
   - `none`: Nessun DJ previsto (campo nascosto)
-- [ ] Campo `djRequests`: lista richieste per diventare DJ
-- [ ] UI: Pulsante "Candidati come DJ" / "Richiedi ruolo DJ"
-- [ ] Notifica al creatore per approvare richieste DJ
+- [x] Campo `djRequests`: lista richieste per diventare DJ
+- [x] Backend routes per candidatura/approvazione/rifiuto DJ
+- [x] UI: Selezione modalità DJ in CreateEventScreen
 
-### 4. Ricerca e Filtri 🆕
-- [ ] Ricerca per città
-- [ ] Filtro per tipo di ballo
-- [ ] Calendario generale (tutti gli eventi visibili)
-- [ ] Combinazione filtri (città + tipo ballo + data)
-- [ ] UI: Barra ricerca, Filtri dropdown
+### 4. Ricerca e Filtri ✅ COMPLETATO
+- [x] Ricerca per città (HomeScreen)
+- [x] Filtro per tipo di ballo (chip filters)
+- [x] Combinazione filtri (città + tipo ballo)
 
 ---
+
+## 🎯 PROSSIME FEATURE DA IMPLEMENTARE
 
 ## 📊 Panoramica Progetto
 

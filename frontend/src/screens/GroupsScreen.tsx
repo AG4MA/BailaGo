@@ -13,7 +13,7 @@ import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
 import { useGroups } from '../contexts';
-import { theme } from '../theme';
+import theme from '../theme';
 import { RootStackParamList, Group, GroupInvite } from '../types';
 
 type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
