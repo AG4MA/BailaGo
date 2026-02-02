@@ -353,6 +353,40 @@ export interface User {
   createdAt: Date;
 }
 
+// ============ GROUPS ============
+
+export type GroupRole = 'admin' | 'member' | 'dj';
+
+export interface GroupMember {
+  userId: string;
+  user: Pick<User, 'id' | 'username' | 'displayName' | 'avatarUrl'>;
+  role: GroupRole;
+  joinedAt: Date;
+}
+
+export interface GroupInvite {
+  id: string;
+  groupId: string;
+  invitedUserId: string;
+  invitedByUserId: string;
+  status: 'pending' | 'accepted' | 'rejected';
+  createdAt: Date;
+  expiresAt: Date;
+}
+
+export interface Group {
+  id: string;
+  name: string;
+  description?: string;
+  imageUrl?: string;
+  creatorId: string;
+  members: GroupMember[];
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+// ============ EVENTS ============
+
 export interface Participant {
   userId: string;
   user: User;

@@ -412,15 +412,39 @@ EXPO_PUBLIC_PROJECT_ID=
 
 
 da fare
+Sei un senior full stack engineer sul progetto “Bailando”. Obiettivo: correggere logica gruppi, lifecycle account, ruolo DJ, visibilità eventi, e creazione evento con selezione luogo semplice e robusta. Regola assoluta: non devi riavviare il server per fare check, debug o verifiche. Il server si riavvia solo se si termina da solo. Le modifiche devono essere applicate e verificabili in live.
 
-QUANDO fai aggiungi persona all'interno di un gruppo, devi fare query veloce veloce su tutti quelli che ci sono nell'app, e cercare in base al nickname, non alla mail
+Correzioni e nuove regole richieste.
 
-se lasci il gruppo ma lhai creato tu, quando esci devi designare per forza un altra persona all'interno del gruppo, se sei solo all'interno non ce lascia gruppo ma solo elimina se l'hai creato tu. nessun lttro lo puo eliminare, come nesusn altro puo eliminare un evento se non lha creato lui, anche se pubblico
+Gruppi, uscita e proprietà
+Quando l’utente è dentro un gruppo deve esistere l’azione “Lascia gruppo” solo se l’uscita è consentita senza violare la continuità amministrativa. Se l’utente è il creator del gruppo valgono regole vincolanti: se è l’unico membro, non deve comparire “Lascia gruppo”, deve comparire solo “Elimina gruppo”. Se invece nel gruppo ci sono altri membri, il creator non può lasciare finché non designa un nuovo admin tra i membri. L’UI deve mostrare un pop up obbligatorio “Scegli nuovo admin” e impedire l’uscita se non viene selezionato un erede. Nessun altro, oltre al creator, può eliminare il gruppo.
 
+Eventi, cancellazione e visibilità
+Un evento può essere eliminato solo dal creator dell’evento, anche se l’evento è pubblico. Nessun partecipante o admin di gruppo diverso dal creator dell’evento deve poterlo eliminare.
 
-non è ancora possibile creare un evento, da un sacco di errori nel terminale. quando crei un evento, nella sezione lugo, deve esserci solamente una barra che poi sara aiutata da API google per ricerca automatica, e sotto la barra ci deve essere la mappa, perche in realta anche psostando il cursore (fisso nella mappa) puoi decidere il luogo cosi in versione piu manuale
+La visibilità non deve perdere l’opzione “gruppo”. Deve esistere una visibilità che consenta di rendere l’evento visibile a un gruppo specifico. Non rimuovere questa modalità. Ripristina e rendi coerente la logica: evento visibile a tutti oppure visibile al gruppo selezionato oppure visibile solo ai partecipanti, se questa terza modalità esiste già nel modello. L’importante è che “gruppo” ci sia e funzioni.
 
-sotto prosismi eventi, i filtri dei balli vanno bene, ma quando selezionata la famiglia, deve uscire una sotto barra con tutti i suoi sotto balli selezionabili ok? deve esserci anche tutti nei sub balli
+Ricerca utenti quando inviti nel gruppo
+Quando si aggiunge una persona a un gruppo, la ricerca deve essere immediata e basata sul nickname, non sulla mail. Implementa una query veloce su tutti gli utenti dell’app filtrando per nickname. L’UI deve proporre risultati mentre si digita.
 
+Account inattivi: disattivazione e cancellazione
+Se un profilo non effettua login per più di 3 mesi, l’account deve essere disattivato automaticamente. Dopo 3 mesi dalla disattivazione, l’account deve essere eliminato, ma non i dati storici associati. Interpreta “non i suoi dati” come: i dati restano in forma preservata per audit o storico, ma l’identità account non è più utilizzabile.
 
-MI RACCOMANDO NON TIRARE GIU IL SERVER, esegui modifiche in live
+Se un account disattivato prova a collegarsi, il sistema deve inviare una mail di riattivazione. Se l’utente non ha più accesso a quell’indirizzo email, deve esistere un flusso “Cambia email” che consenta di inserire un nuovo indirizzo e ricevere lì la mail di attivazione, completando il cambio email e la riattivazione.
+
+Ruolo DJ
+Deve essere possibile aggiungersi come DJ. L’interfaccia e il modello devono prevedere l’opzione e la sua persistenza, con una logica minimale: un utente può proporsi come DJ per un evento, e tale informazione deve essere visibile nell’evento.
+
+Creazione evento: bug e selezione luogo
+Attualmente non è ancora possibile creare un evento e il terminale mostra errori. Priorità: rendere la creazione evento funzionante, eliminando gli errori e stabilizzando la flow end to end.
+
+Nella sezione “Luogo” del form evento deve esserci solo una barra di ricerca. Questa barra in futuro userà API Google per autocompletamento, ma già ora deve essere predisposta come singolo input. Sotto la barra deve esserci una mappa. La scelta luogo deve funzionare anche manualmente: il cursore è fisso al centro della mappa e spostando la mappa si imposta la posizione. Il valore finale deve essere salvato come coordinate più eventuale label testuale dell’input.
+
+Filtri “Prossimi eventi”: sottofamiglie balli
+Sotto “Prossimi eventi” i filtri per famiglie di ballo vanno bene, ma quando selezioni una famiglia deve comparire una sotto-barra con tutti i relativi sotto-balli selezionabili. Nella sotto-barra deve esistere anche l’opzione “Tutti” per includere l’intera famiglia senza restringere ai sotto-balli.
+
+Vincolo operativo di sviluppo
+Non riavviare il server per applicare modifiche o fare controlli. Lavora con hot reload e verifica in live. Se ti serve una validazione, falla senza restart.
+
+Output atteso
+Implementa le modifiche sopra con priorità su: creazione evento funzionante, luogo con input più mappa, logica gruppo creator, ricerca nickname, ripristino visibilità gruppo, filtri con sotto-balli, ruolo DJ, policy inattività account con flussi email.

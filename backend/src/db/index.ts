@@ -96,6 +96,13 @@ export const db = {
       );
     },
 
+    findAll: (): User[] => {
+      return Array.from(users.values()).map(u => {
+        const { password, ...userWithoutPassword } = u;
+        return userWithoutPassword;
+      });
+    },
+
     create: async (input: UserCreateInput): Promise<User> => {
       const hashedPassword = input.password ? await bcrypt.hash(input.password, 10) : undefined;
       const emailVerificationToken = generateToken();
@@ -470,6 +477,7 @@ export const db = {
         name: input.name,
         description: input.description,
         imageUrl: input.imageUrl,
+        creatorId: creator.id, // Aggiungo creator ID
         members: [{
           userId: creator.id,
           user: {

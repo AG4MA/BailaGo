@@ -66,6 +66,7 @@ export interface Group {
   name: string;
   description?: string;
   imageUrl?: string;
+  creatorId: string; // ID del creator del gruppo
   members: GroupMember[];
   createdAt: Date;
   updatedAt: Date;

@@ -18,7 +18,8 @@ interface GroupsContextType {
   deleteGroup: (id: string) => Promise<void>;
   
   // Members
-  inviteMember: (groupId: string, email: string) => Promise<void>;
+  searchUsers: (query: string) => Promise<any[]>;
+  inviteMember: (groupId: string, username: string) => Promise<void>;
   removeMember: (groupId: string, userId: string) => Promise<void>;
   updateMemberRole: (groupId: string, userId: string, role: GroupRole) => Promise<void>;
   leaveGroup: (groupId: string) => Promise<void>;
@@ -169,14 +170,31 @@ export function GroupsProvider({ children }: { children: ReactNode }) {
 
   // ============ MEMBERS ============
 
-  const inviteMember = async (groupId: string, email: string): Promise<void> => {
+  const searchUsers = async (query: string): Promise<any[]> => {
+    if (!token) throw new Error('Non autenticato');
+    if (query.length < 2) return [];
+    
+    const res = await fetch(`${API_URL}/auth/search?q=${encodeURIComponent(query)}`, {
+      headers: authHeaders(),
+    });
+    
+    const data = await res.json();
+    
+    if (!res.ok) {
+      throw new Error(data.error || 'Errore nella ricerca');
+    }
+    
+    return data.data || [];
+  };
+
+  const inviteMember = async (groupId: string, username: string): Promise<void> => {
     if (!token) throw new Error('Non autenticato');
     
-    console.log('[GroupsContext] Inviting member:', email);
+    console.log('[GroupsContext] Inviting member:', username);
     const res = await fetch(`${API_URL}/groups/${groupId}/invite`, {
       method: 'POST',
       headers: authHeaders(),
-      body: JSON.stringify({ email }),
+      body: JSON.stringify({ username }),
     });
     
     const data = await res.json();
@@ -185,7 +203,7 @@ export function GroupsProvider({ children }: { children: ReactNode }) {
       throw new Error(data.error || 'Errore nell\'invio dell\'invito');
     }
     
-    console.log('[GroupsContext] Invite sent to:', email);
+    console.log('[GroupsContext] Invite sent to:', username);
   };
 
   const removeMember = async (groupId: string, userId: string): Promise<void> => {
@@ -319,6 +337,7 @@ export function GroupsProvider({ children }: { children: ReactNode }) {
         createGroup,
         updateGroup,
         deleteGroup,
+        searchUsers,
         inviteMember,
         removeMember,
         updateMemberRole,

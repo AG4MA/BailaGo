@@ -113,7 +113,7 @@ router.put('/:id', authMiddleware, async (req: AuthRequest, res: Response) => {
   }
 });
 
-// DELETE /api/groups/:id - Elimina gruppo (solo admin)
+// DELETE /api/groups/:id - Elimina gruppo (solo creator)
 router.delete('/:id', authMiddleware, async (req: AuthRequest, res: Response) => {
   try {
     const group = db.groups.findById(req.params.id);
@@ -121,8 +121,9 @@ router.delete('/:id', authMiddleware, async (req: AuthRequest, res: Response) =>
       return res.status(404).json({ success: false, error: 'Gruppo non trovato' });
     }
     
-    if (!db.groups.isAdmin(group.id, req.user!.id)) {
-      return res.status(403).json({ success: false, error: 'Solo gli admin possono eliminare il gruppo' });
+    // Solo il creator può eliminare il gruppo
+    if (group.creatorId !== req.user!.id) {
+      return res.status(403).json({ success: false, error: 'Solo il creatore può eliminare il gruppo' });
     }
     
     db.groups.delete(req.params.id);
@@ -140,7 +141,7 @@ router.delete('/:id', authMiddleware, async (req: AuthRequest, res: Response) =>
 // POST /api/groups/:id/invite - Invita utente (solo admin)
 router.post('/:id/invite', authMiddleware, async (req: AuthRequest, res: Response) => {
   try {
-    const { email } = req.body;
+    const { username } = req.body; // Cambiato da email a username (può essere username o nickname)
     
     const group = db.groups.findById(req.params.id);
     if (!group) {
@@ -151,10 +152,15 @@ router.post('/:id/invite', authMiddleware, async (req: AuthRequest, res: Respons
       return res.status(403).json({ success: false, error: 'Solo gli admin possono invitare membri' });
     }
     
-    // Find user by email
-    const userToInvite = db.users.findByEmail(email);
+    // Find user by username, nickname, or displayName
+    const userToInvite = db.users.findByUsername(username) || 
+                         db.users.findByNickname(username) ||
+                         Array.from(db.users.findAll()).find(u => 
+                           u.displayName?.toLowerCase() === username.toLowerCase()
+                         );
+    
     if (!userToInvite) {
-      return res.status(404).json({ success: false, error: 'Utente non trovato con questa email' });
+      return res.status(404).json({ success: false, error: 'Utente non trovato' });
     }
     
     // Check if already member
@@ -163,7 +169,7 @@ router.post('/:id/invite', authMiddleware, async (req: AuthRequest, res: Respons
     }
     
     const invite = db.invites.create(group.id, userToInvite.id, req.user!.id);
-    console.log(`[Groups] Invite sent to ${email} for group ${group.name}`);
+    console.log(`[Groups] Invite sent to ${username} (${userToInvite.id}) for group ${group.name}`);
     
     // TODO: Send push notification to invited user
     
@@ -174,17 +180,54 @@ router.post('/:id/invite', authMiddleware, async (req: AuthRequest, res: Respons
   }
 });
 
-// POST /api/groups/:id/leave - Lascia gruppo
+// POST /api/groups/:id/leave - Lascia gruppo (con logica speciale per creator)
 router.post('/:id/leave', authMiddleware, async (req: AuthRequest, res: Response) => {
   try {
+    const { newAdminId } = req.body; // Optional: ID del nuovo admin se sei il creator
+    
     const group = db.groups.findById(req.params.id);
     if (!group) {
       return res.status(404).json({ success: false, error: 'Gruppo non trovato' });
     }
     
+    const isCreator = group.creatorId === req.user!.id;
+    const isOnlyMember = group.members.length === 1;
+    
+    // Se sei il creator e l'unico membro, non puoi lasciare - devi eliminare
+    if (isCreator && isOnlyMember) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Sei l\'unico membro. Elimina il gruppo invece di uscire.',
+        code: 'MUST_DELETE'
+      });
+    }
+    
+    // Se sei il creator ma ci sono altri membri, devi designare un nuovo admin
+    if (isCreator && !isOnlyMember) {
+      if (!newAdminId) {
+        return res.status(400).json({ 
+          success: false, 
+          error: 'Devi designare un altro membro come admin prima di uscire.',
+          code: 'MUST_DESIGNATE_ADMIN',
+          data: { members: group.members.filter(m => m.userId !== req.user!.id) }
+        });
+      }
+      
+      // Verifica che il nuovo admin sia un membro
+      const newAdminMember = group.members.find(m => m.userId === newAdminId);
+      if (!newAdminMember) {
+        return res.status(400).json({ success: false, error: 'Il nuovo admin deve essere un membro del gruppo' });
+      }
+      
+      // Promuovi il nuovo admin
+      db.groups.updateMemberRole(group.id, newAdminId, 'admin');
+      console.log(`[Groups] New admin designated: ${newAdminId}`);
+    }
+    
+    // Ora puoi uscire
     const result = db.groups.removeMember(req.params.id, req.user!.id);
     if (!result) {
-      return res.status(400).json({ success: false, error: 'Non puoi lasciare il gruppo se sei l\'unico admin' });
+      return res.status(400).json({ success: false, error: 'Impossibile lasciare il gruppo' });
     }
     
     console.log(`[Groups] User left group: ${group.name}`);

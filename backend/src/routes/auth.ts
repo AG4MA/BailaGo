@@ -519,4 +519,47 @@ router.put(
   }
 );
 
+// GET /api/auth/search - Ricerca utenti per nickname/displayName
+router.get(
+  '/search',
+  authMiddleware,
+  async (req: AuthRequest, res: Response): Promise<void> => {
+    try {
+      const query = (req.query.q as string || '').trim().toLowerCase();
+      
+      if (!query || query.length < 2) {
+        res.status(400).json({ success: false, error: 'Query troppo corta (minimo 2 caratteri)' });
+        return;
+      }
+
+      // Cerca in tutti gli utenti
+      const allUsers = db.users.findAll();
+      const matchingUsers = allUsers
+        .filter(u => 
+          u.id !== req.user!.id && ( // Escludi te stesso
+            u.nickname?.toLowerCase().includes(query) ||
+            u.displayName?.toLowerCase().includes(query) ||
+            u.username?.toLowerCase().includes(query)
+          )
+        )
+        .slice(0, 20) // Limita a 20 risultati
+        .map(u => ({
+          id: u.id,
+          username: u.username,
+          nickname: u.nickname,
+          displayName: u.displayName,
+          avatarUrl: u.avatarUrl,
+        }));
+
+      res.json({
+        success: true,
+        data: matchingUsers,
+      });
+    } catch (error) {
+      console.error('Search users error:', error);
+      res.status(500).json({ success: false, error: 'Errore durante la ricerca' });
+    }
+  }
+);
+
 export default router;
