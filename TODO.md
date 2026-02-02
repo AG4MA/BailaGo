@@ -1,6 +1,20 @@
 # BailaGo - TODO & Stato Avanzamento Lavori
 
-> Ultimo aggiornamento: 1 Febbraio 2026
+> Ultimo aggiornamento: 2 Febbraio 2026
+
+## 🚀 Quick Start (Development)
+
+```bash
+# Terminale 1 - Backend (porta 3000)
+cd backend && npm run dev
+
+# Terminale 2 - Frontend Expo (porta 8081/8082)
+cd frontend && npx expo start
+```
+
+**Expo Go:** Scansiona il QR code dal terminale con l'app Expo Go
+
+---
 
 ## 📊 Panoramica Progetto
 
@@ -8,6 +22,7 @@
 |------|-------|---------------|
 | Frontend Base | ✅ Completo | 100% |
 | Backend Base | ✅ Completo | 100% |
+| Primo Test Expo Go | ✅ Completo | 100% |
 | Docker/Nginx | ✅ Completo | 100% |
 | CI/CD GitHub Actions | ✅ Completo | 100% |
 | Autenticazione | 🔶 Parziale | 70% |
@@ -320,11 +335,12 @@ EXPO_PUBLIC_PROJECT_ID=
 
 ## 📅 Roadmap Suggerita
 
-### Fase 1: Test Base (1-2 giorni)
-1. Configurare .env backend e frontend
-2. Avviare backend: `cd backend && npm run dev`
-3. Avviare frontend: `cd frontend && npx expo start`
-4. Testare su Expo Go (senza OAuth/email)
+### Fase 1: Test Base ✅ COMPLETATA (2 Febbraio 2026)
+1. ✅ Installato dipendenze backend e frontend
+2. ✅ Avviato backend: `cd backend && npm run dev` (porta 3000)
+3. ✅ Avviato frontend: `cd frontend && npx expo start` (porta 8082)
+4. ✅ Expo Go pronto per test (scansiona QR code)
+5. ⏳ Test app su dispositivo fisico
 
 ### Fase 2: Servizi Esterni (2-3 giorni)
 1. Configurare Resend/SendGrid per email
