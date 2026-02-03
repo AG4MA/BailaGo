@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -8,6 +8,8 @@ import {
   Alert,
   Share,
   Linking,
+  TextInput,
+  Modal,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -30,8 +32,10 @@ interface EventDetailScreenProps {
 
 export function EventDetailScreen({ navigation, route }: EventDetailScreenProps) {
   const { eventId } = route.params;
-  const { getEventById, joinEvent, leaveEvent, isParticipant, deleteEvent, isLoading } = useEvents();
+  const { getEventById, joinEvent, leaveEvent, isParticipant, deleteEvent, applyAsDj, approveDj, rejectDj, isLoading } = useEvents();
   const { user } = useAuth();
+  const [djModalVisible, setDjModalVisible] = useState(false);
+  const [djMessage, setDjMessage] = useState('');
   
   const event = getEventById(eventId);
   
@@ -137,6 +141,54 @@ export function EventDetailScreen({ navigation, route }: EventDetailScreenProps)
     );
   };
 
+  const handleApplyDj = () => {
+    setDjModalVisible(true);
+  };
+
+  const submitDjApplication = async () => {
+    try {
+      await applyAsDj(eventId, djMessage || undefined);
+      setDjModalVisible(false);
+      setDjMessage('');
+      Alert.alert('Candidatura inviata! 🎧', 'Il creatore dell\'evento valuterà la tua richiesta');
+    } catch (error) {
+      Alert.alert('Errore', 'Impossibile inviare la candidatura. Riprova.');
+    }
+  };
+
+  const handleApproveDj = async (userId: string) => {
+    try {
+      await approveDj(eventId, userId);
+      Alert.alert('DJ approvato! 🎉', 'Il DJ è stato assegnato all\'evento');
+    } catch (error) {
+      Alert.alert('Errore', 'Impossibile approvare il DJ. Riprova.');
+    }
+  };
+
+  const handleRejectDj = async (userId: string) => {
+    Alert.alert(
+      'Rifiuta candidatura',
+      'Sei sicuro di voler rifiutare questa candidatura?',
+      [
+        { text: 'Annulla', style: 'cancel' },
+        {
+          text: 'Rifiuta',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await rejectDj(eventId, userId);
+            } catch (error) {
+              Alert.alert('Errore', 'Impossibile rifiutare il DJ. Riprova.');
+            }
+          }
+        }
+      ]
+    );
+  };
+
+  // Check if user already applied
+  const hasApplied = event.djRequests?.some(r => r.userId === user?.id) || false;
+
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView showsVerticalScrollIndicator={false}>
@@ -195,7 +247,8 @@ export function EventDetailScreen({ navigation, route }: EventDetailScreenProps)
               </View>
             </View>
 
-            {event.djName && (
+            {/* DJ Section - always show if djMode is not 'none' */}
+            {event.djMode !== 'none' && (
               <>
                 <View style={styles.divider} />
                 <View style={styles.infoRow}>
@@ -204,12 +257,75 @@ export function EventDetailScreen({ navigation, route }: EventDetailScreenProps)
                   </View>
                   <View style={styles.infoContent}>
                     <Text style={styles.infoLabel}>DJ della serata</Text>
-                    <Text style={styles.infoValue}>{event.djName}</Text>
+                    {event.djName ? (
+                      <Text style={styles.infoValue}>{event.djName}</Text>
+                    ) : (
+                      <Text style={[styles.infoSubvalue, { fontStyle: 'italic' }]}>
+                        {event.djMode === 'open' ? 'Aperto a candidature' : 'Da assegnare'}
+                      </Text>
+                    )}
                   </View>
                 </View>
               </>
             )}
           </View>
+
+          {/* DJ Candidature Section */}
+          {event.djMode === 'open' && !isCreator && !event.djUserId && (
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>🎧 Vuoi fare il DJ?</Text>
+              {hasApplied ? (
+                <View style={styles.djAppliedCard}>
+                  <Ionicons name="checkmark-circle" size={24} color={colors.success} />
+                  <Text style={styles.djAppliedText}>Candidatura inviata</Text>
+                </View>
+              ) : (
+                <>
+                  <TouchableOpacity 
+                    style={[styles.djApplyButton, { backgroundColor: danceInfo?.color }]}
+                    onPress={handleApplyDj}
+                  >
+                    <Ionicons name="hand-right" size={20} color="#fff" />
+                    <Text style={styles.djApplyButtonText}>Candidati come DJ</Text>
+                  </TouchableOpacity>
+                  <Text style={styles.djApplyHint}>
+                    Il creatore dell'evento valuterà la tua candidatura
+                  </Text>
+                </>
+              )}
+            </View>
+          )}
+
+          {/* Show DJ requests to creator */}
+          {isCreator && event.djRequests && event.djRequests.length > 0 && (
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>Candidature DJ</Text>
+              {event.djRequests.filter(r => r.status === 'pending').map(request => (
+                <View key={request.userId} style={styles.djRequestCard}>
+                  <View style={styles.djRequestInfo}>
+                    <Text style={styles.djRequestName}>{request.user.displayName}</Text>
+                    {request.message && (
+                      <Text style={styles.djRequestMessage}>{request.message}</Text>
+                    )}
+                  </View>
+                  <View style={styles.djRequestActions}>
+                    <TouchableOpacity 
+                      style={styles.djApproveBtn}
+                      onPress={() => handleApproveDj(request.userId)}
+                    >
+                      <Ionicons name="checkmark" size={20} color="#fff" />
+                    </TouchableOpacity>
+                    <TouchableOpacity 
+                      style={styles.djRejectBtn}
+                      onPress={() => handleRejectDj(request.userId)}
+                    >
+                      <Ionicons name="close" size={20} color="#fff" />
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              ))}
+            </View>
+          )}
 
           {/* Descrizione */}
           {event.description && (
@@ -325,6 +441,46 @@ export function EventDetailScreen({ navigation, route }: EventDetailScreenProps)
           />
         </View>
       )}
+
+      {/* DJ Application Modal */}
+      <Modal
+        visible={djModalVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setDjModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>🎧 Candidatura DJ</Text>
+            <Text style={styles.modalSubtitle}>
+              Aggiungi un messaggio per presentarti (opzionale)
+            </Text>
+            <TextInput
+              style={styles.djMessageInput}
+              placeholder="Es: Sono DJ da 5 anni, specializzato in salsa cubana..."
+              value={djMessage}
+              onChangeText={setDjMessage}
+              multiline
+              numberOfLines={4}
+              textAlignVertical="top"
+            />
+            <View style={styles.modalButtons}>
+              <TouchableOpacity 
+                style={styles.modalCancelBtn}
+                onPress={() => setDjModalVisible(false)}
+              >
+                <Text style={styles.modalCancelText}>Annulla</Text>
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={[styles.modalSubmitBtn, { backgroundColor: danceInfo?.color }]}
+                onPress={submitDjApplication}
+              >
+                <Text style={styles.modalSubmitText}>Invia candidatura</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -582,5 +738,163 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: colors.border,
     backgroundColor: colors.background,
+  },
+
+  // DJ Styles
+  djApplyButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: spacing.md,
+    borderRadius: borderRadius.md,
+    gap: spacing.sm,
+  },
+
+  djApplyButtonText: {
+    ...typography.body,
+    color: colors.textWhite,
+    fontWeight: '600',
+  },
+
+  djApplyHint: {
+    ...typography.caption,
+    color: colors.textSecondary,
+    textAlign: 'center',
+    marginTop: spacing.sm,
+  },
+
+  djAppliedCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.successLight,
+    padding: spacing.md,
+    borderRadius: borderRadius.md,
+    gap: spacing.sm,
+  },
+
+  djAppliedText: {
+    ...typography.body,
+    color: colors.success,
+    fontWeight: '600',
+  },
+
+  djRequestCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.card,
+    padding: spacing.md,
+    borderRadius: borderRadius.md,
+    marginBottom: spacing.sm,
+    ...shadows.small,
+  },
+
+  djRequestInfo: {
+    flex: 1,
+  },
+
+  djRequestName: {
+    ...typography.body,
+    color: colors.text,
+    fontWeight: '600',
+  },
+
+  djRequestMessage: {
+    ...typography.bodySmall,
+    color: colors.textSecondary,
+    marginTop: spacing.xs,
+  },
+
+  djRequestActions: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+  },
+
+  djApproveBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: colors.success,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  djRejectBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: colors.error,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  // Modal Styles
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'flex-end',
+  },
+
+  modalContent: {
+    backgroundColor: colors.card,
+    borderTopLeftRadius: borderRadius.xl,
+    borderTopRightRadius: borderRadius.xl,
+    padding: spacing.lg,
+  },
+
+  modalTitle: {
+    ...typography.h2,
+    color: colors.text,
+    textAlign: 'center',
+    marginBottom: spacing.xs,
+  },
+
+  modalSubtitle: {
+    ...typography.body,
+    color: colors.textSecondary,
+    textAlign: 'center',
+    marginBottom: spacing.lg,
+  },
+
+  djMessageInput: {
+    backgroundColor: colors.backgroundSecondary,
+    borderRadius: borderRadius.md,
+    padding: spacing.md,
+    ...typography.body,
+    color: colors.text,
+    minHeight: 100,
+    marginBottom: spacing.lg,
+  },
+
+  modalButtons: {
+    flexDirection: 'row',
+    gap: spacing.md,
+  },
+
+  modalCancelBtn: {
+    flex: 1,
+    padding: spacing.md,
+    borderRadius: borderRadius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    alignItems: 'center',
+  },
+
+  modalCancelText: {
+    ...typography.body,
+    color: colors.textSecondary,
+  },
+
+  modalSubmitBtn: {
+    flex: 1,
+    padding: spacing.md,
+    borderRadius: borderRadius.md,
+    alignItems: 'center',
+  },
+
+  modalSubmitText: {
+    ...typography.body,
+    color: colors.textWhite,
+    fontWeight: '600',
   },
 });

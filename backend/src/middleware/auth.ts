@@ -3,6 +3,7 @@ import jwt from 'jsonwebtoken';
 import { config } from '../config/index.js';
 import { db } from '../db/index.js';
 import { User } from '../types/index.js';
+import { accountInactivityService } from '../services/accountInactivity.js';
 
 export interface AuthRequest extends Request {
   user?: User;
@@ -29,6 +30,15 @@ export const authMiddleware = async (
       res.status(401).json({ success: false, error: 'Utente non trovato' });
       return;
     }
+
+    // Check if account is deleted
+    if (user.status === 'deleted') {
+      res.status(403).json({ success: false, error: 'Account eliminato' });
+      return;
+    }
+
+    // Update last active timestamp (reactivates deactivated accounts)
+    await accountInactivityService.updateLastActive(user.id);
 
     const { password, ...userWithoutPassword } = user;
     req.user = userWithoutPassword;

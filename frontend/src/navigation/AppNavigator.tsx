@@ -17,6 +17,7 @@ import {
   GroupsScreen,
   CreateGroupScreen,
   GroupDetailScreen,
+  LocationPickerScreen,
 } from '../screens';
 import {
   LoginScreen,
@@ -204,6 +205,11 @@ export function AppNavigator() {
             <Stack.Screen 
               name="GroupDetail" 
               component={GroupDetailScreen}
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen 
+              name="LocationPicker" 
+              component={LocationPickerScreen}
               options={{ headerShown: false }}
             />
             <Stack.Screen 

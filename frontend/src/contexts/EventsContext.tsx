@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, ReactNode } from 'react';
-import { DanceEvent, CreateEventData, DanceType, User, Participant } from '../types';
+import { DanceEvent, CreateEventData, DanceType, User, Participant, DjRequest } from '../types';
 import { useAuth } from './AuthContext';
 
 // Semplice generatore di ID per React Native
@@ -21,6 +21,10 @@ interface EventsContextType {
   joinEvent: (eventId: string) => Promise<void>;
   leaveEvent: (eventId: string) => Promise<void>;
   isParticipant: (eventId: string) => boolean;
+  // DJ functions
+  applyAsDj: (eventId: string, message?: string) => Promise<void>;
+  approveDj: (eventId: string, userId: string) => Promise<void>;
+  rejectDj: (eventId: string, userId: string) => Promise<void>;
 }
 
 const EventsContext = createContext<EventsContextType | undefined>(undefined);
@@ -39,7 +43,7 @@ const createMockEvents = (creatorUser: User): DanceEvent[] => {
       id: '1',
       title: 'Salsa in Piazza Duomo',
       description: 'Una serata di salsa all\'aperto nel cuore di Milano! Porta amici e buon umore 💃',
-      danceType: 'salsa',
+      danceType: 'salsa_cubana',
       location: {
         id: 'loc1',
         name: 'Piazza Duomo',
@@ -53,7 +57,11 @@ const createMockEvents = (creatorUser: User): DanceEvent[] => {
       endTime: '00:00',
       creatorId: creatorUser.id,
       creator: creatorUser,
+      visibility: 'public',
+      participationMode: 'open',
+      djMode: 'assigned',
       djName: 'DJ Carlos',
+      djRequests: [],
       participants: [],
       showParticipantNames: true,
       createdAt: now,
@@ -63,7 +71,7 @@ const createMockEvents = (creatorUser: User): DanceEvent[] => {
       id: '2',
       title: 'Bachata Night @ Navigli',
       description: 'Bachata sensuale lungo i navigli. DJ set e lezione gratuita alle 20:30!',
-      danceType: 'bachata',
+      danceType: 'bachata_sensual',
       location: {
         id: 'loc2',
         name: 'Darsena Navigli',
@@ -80,10 +88,14 @@ const createMockEvents = (creatorUser: User): DanceEvent[] => {
         id: '2',
         username: 'bachatero',
         displayName: 'Luca Bachata',
-        favoriteDances: ['bachata'],
+        favoriteDances: ['bachata_sensual'],
         createdAt: new Date(),
       },
+      visibility: 'public',
+      participationMode: 'open',
+      djMode: 'open',
       djName: 'DJ Romeo',
+      djRequests: [],
       participants: [],
       maxParticipants: 50,
       showParticipantNames: false,
@@ -151,10 +163,27 @@ export function EventsProvider({ children }: { children: ReactNode }) {
 
       const newEvent: DanceEvent = {
         id: generateId(),
-        ...data,
+        title: data.title,
+        description: data.description || '',
+        danceType: data.danceType,
+        location: data.location,
+        date: data.date,
+        startTime: data.startTime,
+        endTime: data.endTime,
         creatorId: user.id,
         creator: user,
+        visibility: data.visibility || 'public',
+        participationMode: data.participationMode || 'open',
+        groupId: data.groupId,
+        djMode: data.djMode || 'open',
+        djName: data.djName,
+        djContact: data.djContact,
+        djUserId: data.djUserId,
+        djRequests: [],
         participants: [],
+        maxParticipants: data.maxParticipants,
+        showParticipantNames: data.showParticipantNames,
+        imageUrl: data.imageUrl,
         createdAt: new Date(),
         updatedAt: new Date(),
       };
@@ -241,6 +270,93 @@ export function EventsProvider({ children }: { children: ReactNode }) {
     return event?.participants.some(p => p.userId === user.id) || false;
   };
 
+  // DJ Functions
+  const applyAsDj = async (eventId: string, message?: string): Promise<void> => {
+    if (!user) throw new Error('User not authenticated');
+
+    setIsLoading(true);
+    try {
+      await new Promise(resolve => setTimeout(resolve, 300));
+
+      const djRequest: DjRequest = {
+        userId: user.id,
+        user: {
+          id: user.id,
+          username: user.username,
+          displayName: user.displayName,
+          avatarUrl: user.avatarUrl,
+        },
+        message,
+        requestedAt: new Date(),
+        status: 'pending',
+      };
+
+      setEvents(prev => prev.map(e => 
+        e.id === eventId 
+          ? { 
+              ...e, 
+              djRequests: [...(e.djRequests || []), djRequest],
+              updatedAt: new Date() 
+            }
+          : e
+      ));
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const approveDj = async (eventId: string, userId: string): Promise<void> => {
+    if (!user) throw new Error('User not authenticated');
+
+    setIsLoading(true);
+    try {
+      await new Promise(resolve => setTimeout(resolve, 300));
+
+      setEvents(prev => prev.map(e => {
+        if (e.id !== eventId) return e;
+        
+        const approvedRequest = e.djRequests?.find(r => r.userId === userId);
+        if (!approvedRequest) return e;
+
+        return { 
+          ...e, 
+          djUserId: userId,
+          djName: approvedRequest.user.displayName,
+          djRequests: e.djRequests?.map(r => ({
+            ...r,
+            status: r.userId === userId ? 'approved' as const : 'rejected' as const,
+          })),
+          updatedAt: new Date() 
+        };
+      }));
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const rejectDj = async (eventId: string, userId: string): Promise<void> => {
+    if (!user) throw new Error('User not authenticated');
+
+    setIsLoading(true);
+    try {
+      await new Promise(resolve => setTimeout(resolve, 300));
+
+      setEvents(prev => prev.map(e => 
+        e.id === eventId 
+          ? { 
+              ...e, 
+              djRequests: e.djRequests?.map(r => 
+                r.userId === userId ? { ...r, status: 'rejected' as const } : r
+              ),
+              updatedAt: new Date() 
+            }
+          : e
+      ));
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   return (
     <EventsContext.Provider
       value={{
@@ -257,6 +373,9 @@ export function EventsProvider({ children }: { children: ReactNode }) {
         joinEvent,
         leaveEvent,
         isParticipant,
+        applyAsDj,
+        approveDj,
+        rejectDj,
       }}
     >
       {children}

@@ -10,12 +10,13 @@ import {
   Modal,
   ActivityIndicator,
   RefreshControl,
+  ScrollView,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useRoute, useFocusEffect, RouteProp } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
-import { useGroups } from '../contexts';
+import { useGroups, useAuth } from '../contexts';
 import theme from '../theme';
 import { RootStackParamList, Group, GroupMember, GroupRole } from '../types';
 
@@ -26,14 +27,23 @@ export function GroupDetailScreen() {
   const navigation = useNavigation<NavigationProp>();
   const route = useRoute<GroupDetailRouteProp>();
   const { groupId } = route.params;
+  const { user } = useAuth();
   
-  const { getGroup, inviteMember, removeMember, updateMemberRole, leaveGroup, deleteGroup } = useGroups();
+  const { getGroup, inviteMember, searchUsers, removeMember, updateMemberRole, leaveGroup, deleteGroup } = useGroups();
   
   const [group, setGroup] = useState<Group | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [showInviteModal, setShowInviteModal] = useState(false);
-  const [inviteEmail, setInviteEmail] = useState('');
+  const [showAdminModal, setShowAdminModal] = useState(false);
+  const [inviteQuery, setInviteQuery] = useState('');
+  const [searchResults, setSearchResults] = useState<any[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
   const [isInviting, setIsInviting] = useState(false);
+  const [selectedNewAdmin, setSelectedNewAdmin] = useState<string | null>(null);
+
+  // Compute if current user is creator
+  const isCreator = user?.id === group?.creatorId;
+  const isOnlyMember = group?.members?.length === 1;
 
   const fetchGroup = async () => {
     setIsLoading(true);
@@ -48,18 +58,36 @@ export function GroupDetailScreen() {
     }, [groupId])
   );
 
-  const handleInvite = async () => {
-    if (!inviteEmail.trim()) {
-      Alert.alert('Errore', 'Inserisci un\'email');
+  // Handle search for users to invite
+  const handleSearch = async (query: string) => {
+    setInviteQuery(query);
+    if (query.length < 2) {
+      setSearchResults([]);
       return;
     }
     
+    setIsSearching(true);
+    try {
+      const results = await searchUsers(query);
+      // Filter out users who are already members
+      const memberIds = group?.members.map(m => m.userId) || [];
+      const filteredResults = results.filter(u => !memberIds.includes(u.id));
+      setSearchResults(filteredResults);
+    } catch (error) {
+      console.error('Search error:', error);
+    } finally {
+      setIsSearching(false);
+    }
+  };
+
+  const handleInvite = async (username: string) => {
     setIsInviting(true);
     try {
-      await inviteMember(groupId, inviteEmail.trim());
+      await inviteMember(groupId, username);
       Alert.alert('Successo', 'Invito inviato!');
       setShowInviteModal(false);
-      setInviteEmail('');
+      setInviteQuery('');
+      setSearchResults([]);
     } catch (error: any) {
       Alert.alert('Errore', error.message);
     } finally {
@@ -117,6 +145,23 @@ export function GroupDetailScreen() {
   };
 
   const handleLeaveGroup = () => {
+    // If creator and only member, can't leave - must delete
+    if (isCreator && isOnlyMember) {
+      Alert.alert(
+        'Non puoi lasciare',
+        'Sei l\'unico membro del gruppo. Puoi solo eliminarlo.',
+        [{ text: 'OK' }]
+      );
+      return;
+    }
+    
+    // If creator but there are other members, must designate new admin
+    if (isCreator && !isOnlyMember) {
+      setShowAdminModal(true);
+      return;
+    }
+    
+    // Regular member can leave
     Alert.alert(
       'Lascia gruppo',
       'Vuoi davvero uscire da questo gruppo?',
@@ -136,6 +181,23 @@ export function GroupDetailScreen() {
         },
       ]
     );
+  };
+
+  const handleLeaveWithNewAdmin = async () => {
+    if (!selectedNewAdmin) {
+      Alert.alert('Errore', 'Seleziona un nuovo admin');
+      return;
+    }
+    
+    try {
+      // First promote the new admin
+      await updateMemberRole(groupId, selectedNewAdmin, 'admin');
+      // Then leave the group
+      await leaveGroup(groupId);
+      navigation.goBack();
+    } catch (error: any) {
+      Alert.alert('Errore', error.message);
+    }
   };
 
   const handleDeleteGroup = () => {
@@ -273,12 +335,18 @@ export function GroupDetailScreen() {
 
       {/* Actions */}
       <View style={styles.actions}>
-        <TouchableOpacity style={styles.leaveButton} onPress={handleLeaveGroup}>
-          <Ionicons name="exit-outline" size={20} color={theme.colors.error} />
-          <Text style={styles.leaveButtonText}>Lascia gruppo</Text>
-        </TouchableOpacity>
+        {/* Show "Lascia gruppo" only if leaving is allowed */}
+        {!(isCreator && isOnlyMember) && (
+          <TouchableOpacity style={styles.leaveButton} onPress={handleLeaveGroup}>
+            <Ionicons name="exit-outline" size={20} color={theme.colors.error} />
+            <Text style={styles.leaveButtonText}>
+              {isCreator ? 'Lascia e designa admin' : 'Lascia gruppo'}
+            </Text>
+          </TouchableOpacity>
+        )}
         
-        {group.isAdmin && (
+        {/* Only creator can delete */}
+        {isCreator && (
           <TouchableOpacity style={styles.deleteButton} onPress={handleDeleteGroup}>
             <Ionicons name="trash-outline" size={20} color="#fff" />
             <Text style={styles.deleteButtonText}>Elimina</Text>
@@ -286,7 +354,7 @@ export function GroupDetailScreen() {
         )}
       </View>
 
-      {/* Invite Modal */}
+      {/* Invite Modal - with nickname search */}
       <Modal
         visible={showInviteModal}
         animationType="slide"
@@ -297,41 +365,123 @@ export function GroupDetailScreen() {
           <View style={styles.modalContent}>
             <Text style={styles.modalTitle}>Invita membro</Text>
             <Text style={styles.modalSubtitle}>
-              Inserisci l'email dell'utente da invitare
+              Cerca per nickname o nome
             </Text>
             
-            <TextInput
-              style={styles.modalInput}
-              value={inviteEmail}
-              onChangeText={setInviteEmail}
-              placeholder="email@esempio.com"
-              placeholderTextColor={theme.colors.textLight}
-              keyboardType="email-address"
-              autoCapitalize="none"
-              autoFocus
-            />
+            <View style={styles.searchContainer}>
+              <Ionicons name="search" size={20} color={theme.colors.textLight} />
+              <TextInput
+                style={styles.searchInput}
+                value={inviteQuery}
+                onChangeText={handleSearch}
+                placeholder="Cerca utente..."
+                placeholderTextColor={theme.colors.textLight}
+                autoCapitalize="none"
+                autoFocus
+              />
+              {isSearching && <ActivityIndicator size="small" color={theme.colors.primary} />}
+            </View>
+            
+            <ScrollView style={styles.searchResults}>
+              {searchResults.map(user => (
+                <TouchableOpacity
+                  key={user.id}
+                  style={styles.searchResultItem}
+                  onPress={() => handleInvite(user.username)}
+                  disabled={isInviting}
+                >
+                  <View style={styles.userAvatar}>
+                    <Text style={styles.userAvatarText}>
+                      {user.displayName?.[0]?.toUpperCase() || '?'}
+                    </Text>
+                  </View>
+                  <View style={styles.userInfo}>
+                    <Text style={styles.userName}>{user.displayName}</Text>
+                    <Text style={styles.userNickname}>@{user.nickname || user.username}</Text>
+                  </View>
+                  <Ionicons name="person-add" size={20} color={theme.colors.primary} />
+                </TouchableOpacity>
+              ))}
+              {inviteQuery.length >= 2 && searchResults.length === 0 && !isSearching && (
+                <Text style={styles.noResults}>Nessun utente trovato</Text>
+              )}
+            </ScrollView>
+            
+            <TouchableOpacity
+              style={styles.modalCancelButton}
+              onPress={() => {
+                setShowInviteModal(false);
+                setInviteQuery('');
+                setSearchResults([]);
+              }}
+            >
+              <Text style={styles.modalCancelText}>Chiudi</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Select New Admin Modal */}
+      <Modal
+        visible={showAdminModal}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setShowAdminModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Scegli nuovo admin</Text>
+            <Text style={styles.modalSubtitle}>
+              Prima di lasciare il gruppo, devi designare un nuovo amministratore
+            </Text>
+            
+            <ScrollView style={styles.adminList}>
+              {group?.members
+                .filter(m => m.userId !== user?.id)
+                .map(member => (
+                  <TouchableOpacity
+                    key={member.userId}
+                    style={[
+                      styles.adminOption,
+                      selectedNewAdmin === member.userId && styles.adminOptionSelected
+                    ]}
+                    onPress={() => setSelectedNewAdmin(member.userId)}
+                  >
+                    <View style={styles.userAvatar}>
+                      <Text style={styles.userAvatarText}>
+                        {member.user.displayName?.[0]?.toUpperCase() || '?'}
+                      </Text>
+                    </View>
+                    <View style={styles.userInfo}>
+                      <Text style={styles.userName}>{member.user.displayName}</Text>
+                      <Text style={styles.userNickname}>@{member.user.username}</Text>
+                    </View>
+                    <Ionicons 
+                      name={selectedNewAdmin === member.userId ? "checkmark-circle" : "ellipse-outline"} 
+                      size={24} 
+                      color={selectedNewAdmin === member.userId ? theme.colors.primary : theme.colors.textLight} 
+                    />
+                  </TouchableOpacity>
+                ))}
+            </ScrollView>
             
             <View style={styles.modalActions}>
               <TouchableOpacity
                 style={styles.modalCancelButton}
                 onPress={() => {
-                  setShowInviteModal(false);
-                  setInviteEmail('');
+                  setShowAdminModal(false);
+                  setSelectedNewAdmin(null);
                 }}
               >
                 <Text style={styles.modalCancelText}>Annulla</Text>
               </TouchableOpacity>
               
               <TouchableOpacity
-                style={[styles.modalSendButton, (!inviteEmail.trim() || isInviting) && styles.modalButtonDisabled]}
-                onPress={handleInvite}
-                disabled={!inviteEmail.trim() || isInviting}
+                style={[styles.modalSendButton, !selectedNewAdmin && styles.modalButtonDisabled]}
+                onPress={handleLeaveWithNewAdmin}
+                disabled={!selectedNewAdmin}
               >
-                {isInviting ? (
-                  <ActivityIndicator color="#fff" size="small" />
-                ) : (
-                  <Text style={styles.modalSendText}>Invia invito</Text>
-                )}
+                <Text style={styles.modalSendText}>Conferma ed esci</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -559,5 +709,83 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 16,
     fontWeight: '600',
+  },
+  // Search styles
+  searchContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: theme.colors.background,
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    gap: 8,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 16,
+    color: theme.colors.text,
+  },
+  searchResults: {
+    maxHeight: 250,
+    marginBottom: 12,
+  },
+  searchResultItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 12,
+    backgroundColor: theme.colors.background,
+    borderRadius: 8,
+    marginBottom: 8,
+  },
+  userAvatar: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: theme.colors.primary,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  userAvatarText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  userInfo: {
+    flex: 1,
+    marginLeft: 12,
+  },
+  userName: {
+    fontSize: 15,
+    fontWeight: '500',
+    color: theme.colors.text,
+  },
+  userNickname: {
+    fontSize: 13,
+    color: theme.colors.textLight,
+  },
+  noResults: {
+    textAlign: 'center',
+    color: theme.colors.textLight,
+    paddingVertical: 20,
+  },
+  adminList: {
+    maxHeight: 300,
+    marginBottom: 12,
+  },
+  adminOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 12,
+    backgroundColor: theme.colors.background,
+    borderRadius: 8,
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: 'transparent',
+  },
+  adminOptionSelected: {
+    borderColor: theme.colors.primary,
+    backgroundColor: `${theme.colors.primary}10`,
   },
 });

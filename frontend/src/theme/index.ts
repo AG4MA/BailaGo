@@ -16,6 +16,7 @@ export const colors = {
   textWhite: '#FFFFFF',
   
   success: '#00B894',
+  successLight: '#E8F8F5',
   warning: '#FDCB6E',
   error: '#D63031',
   

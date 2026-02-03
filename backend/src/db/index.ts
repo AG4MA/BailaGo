@@ -34,6 +34,8 @@ const seedUser: UserWithPassword = {
   password: bcrypt.hashSync('demo123', 10),
   provider: 'local',
   pushEnabled: true,
+  status: 'active',
+  lastActiveAt: new Date(),
   createdAt: new Date(),
   updatedAt: new Date(),
 };
@@ -53,6 +55,8 @@ const testUser: UserWithPassword = {
   password: bcrypt.hashSync('test', 10),
   provider: 'local',
   pushEnabled: true,
+  status: 'active',
+  lastActiveAt: new Date(),
   createdAt: new Date(),
   updatedAt: new Date(),
 };
@@ -103,6 +107,11 @@ export const db = {
       });
     },
 
+    // Find all users with status info for inactivity checks
+    findAllWithStatus: (): UserWithPassword[] => {
+      return Array.from(users.values());
+    },
+
     create: async (input: UserCreateInput): Promise<User> => {
       const hashedPassword = input.password ? await bcrypt.hash(input.password, 10) : undefined;
       const emailVerificationToken = generateToken();
@@ -123,6 +132,8 @@ export const db = {
         provider: 'local',
         favoriteDances: [],
         pushEnabled: true,
+        status: 'active',
+        lastActiveAt: new Date(),
         createdAt: new Date(),
         updatedAt: new Date(),
       };
@@ -148,6 +159,8 @@ export const db = {
         providerId: input.providerId,
         favoriteDances: [],
         pushEnabled: true,
+        status: 'active',
+        lastActiveAt: new Date(),
         createdAt: new Date(),
         updatedAt: new Date(),
       };

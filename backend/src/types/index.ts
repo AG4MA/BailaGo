@@ -122,6 +122,12 @@ export interface User {
   pushToken?: string;
   pushEnabled: boolean;
   
+  // Account Status & Inactivity
+  status: 'active' | 'inactive' | 'deactivated' | 'deleted';
+  lastActiveAt: Date;
+  deactivatedAt?: Date;
+  scheduledDeletionAt?: Date;
+  
   createdAt: Date;
   updatedAt: Date;
 }

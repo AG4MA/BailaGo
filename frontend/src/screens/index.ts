@@ -9,3 +9,4 @@ export { ProfileScreen } from './ProfileScreen';
 export { GroupsScreen } from './GroupsScreen';
 export { CreateGroupScreen } from './CreateGroupScreen';
 export { GroupDetailScreen } from './GroupDetailScreen';
+export { LocationPickerScreen } from './LocationPickerScreen';

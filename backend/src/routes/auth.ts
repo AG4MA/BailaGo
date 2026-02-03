@@ -6,6 +6,7 @@ import { UserCreateInput, UserLoginInput, OAuthLoginInput, ForgotPasswordInput, 
 import { sendVerificationEmail, sendPasswordResetEmail, sendPasswordChangedEmail, sendWelcomeEmail } from '../services/email.js';
 import { config } from '../config/index.js';
 import { OAuth2Client } from 'google-auth-library';
+import { accountInactivityService } from '../services/accountInactivity.js';
 
 const router = Router();
 
@@ -558,6 +559,81 @@ router.get(
     } catch (error) {
       console.error('Search users error:', error);
       res.status(500).json({ success: false, error: 'Errore durante la ricerca' });
+    }
+  }
+);
+
+// ============ ACCOUNT INACTIVITY ROUTES ============
+
+// GET /api/auth/account-status - Get current user's account inactivity status
+router.get(
+  '/account-status',
+  authMiddleware,
+  async (req: AuthRequest, res: Response): Promise<void> => {
+    try {
+      const status = accountInactivityService.getInactivityStatus(req.user!.id);
+      
+      if (!status) {
+        res.status(404).json({ success: false, error: 'Stato account non trovato' });
+        return;
+      }
+
+      res.json({
+        success: true,
+        data: status,
+      });
+    } catch (error) {
+      console.error('Get account status error:', error);
+      res.status(500).json({ success: false, error: 'Errore durante il recupero dello stato account' });
+    }
+  }
+);
+
+// POST /api/auth/reactivate - Manually reactivate a deactivated account
+router.post(
+  '/reactivate',
+  authMiddleware,
+  async (req: AuthRequest, res: Response): Promise<void> => {
+    try {
+      const success = await accountInactivityService.reactivateAccount(req.user!.id);
+      
+      if (!success) {
+        res.status(400).json({ success: false, error: 'Impossibile riattivare l\'account' });
+        return;
+      }
+
+      res.json({
+        success: true,
+        message: 'Account riattivato con successo',
+      });
+    } catch (error) {
+      console.error('Reactivate account error:', error);
+      res.status(500).json({ success: false, error: 'Errore durante la riattivazione' });
+    }
+  }
+);
+
+// POST /api/auth/check-inactive - Admin endpoint to run inactivity check (should be protected in production)
+router.post(
+  '/check-inactive',
+  async (req: AuthRequest, res: Response): Promise<void> => {
+    try {
+      // In production, this should be protected with admin auth or API key
+      const adminKey = req.headers['x-admin-key'];
+      if (adminKey !== process.env.ADMIN_API_KEY && process.env.NODE_ENV === 'production') {
+        res.status(403).json({ success: false, error: 'Non autorizzato' });
+        return;
+      }
+
+      const result = await accountInactivityService.checkInactiveAccounts();
+      
+      res.json({
+        success: true,
+        data: result,
+      });
+    } catch (error) {
+      console.error('Check inactive accounts error:', error);
+      res.status(500).json({ success: false, error: 'Errore durante il controllo degli account inattivi' });
     }
   }
 );

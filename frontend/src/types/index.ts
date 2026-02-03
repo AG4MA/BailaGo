@@ -343,6 +343,8 @@ export interface Location {
   longitude?: number;
 }
 
+export type AccountStatus = 'active' | 'inactive' | 'deactivated' | 'deleted';
+
 export interface User {
   id: string;
   username: string;
@@ -350,6 +352,11 @@ export interface User {
   avatarUrl?: string;
   bio?: string;
   favoriteDances: DanceType[];
+  // Account Status & Inactivity
+  status?: AccountStatus;
+  lastActiveAt?: Date;
+  deactivatedAt?: Date;
+  scheduledDeletionAt?: Date;
   createdAt: Date;
 }
 
@@ -381,8 +388,40 @@ export interface Group {
   imageUrl?: string;
   creatorId: string;
   members: GroupMember[];
+  memberCount?: number;
+  isAdmin?: boolean;
+  isCreator?: boolean;
   createdAt: Date;
   updatedAt: Date;
+}
+
+export interface CreateGroupData {
+  name: string;
+  description?: string;
+  imageUrl?: string;
+}
+
+// ============ VISIBILITY & DJ MODE ============
+
+// Visibilità evento
+export type EventVisibility = 'public' | 'private' | 'group';
+
+// Modalità partecipazione
+export type ParticipationMode = 'open' | 'approval' | 'invite';
+
+// Modalità DJ
+export type DjMode = 
+  | 'open'      // Chiunque può candidarsi come DJ
+  | 'assigned'  // DJ pre-assegnato, altri possono richiedere
+  | 'none';     // Nessun DJ previsto (campo nascosto)
+
+// Richiesta per diventare DJ
+export interface DjRequest {
+  userId: string;
+  user: Pick<User, 'id' | 'username' | 'displayName' | 'avatarUrl'>;
+  message?: string;
+  requestedAt: Date;
+  status: 'pending' | 'approved' | 'rejected';
 }
 
 // ============ EVENTS ============
@@ -437,12 +476,12 @@ export interface CreateEventData {
   endTime?: string;
   
   // Visibilità e partecipazione
-  visibility: EventVisibility;
-  participationMode: ParticipationMode;
+  visibility?: EventVisibility;
+  participationMode?: ParticipationMode;
   groupId?: string;
   
   // DJ
-  djMode: DjMode;
+  djMode?: DjMode;
   djName?: string;
   djContact?: string;
   djUserId?: string;
